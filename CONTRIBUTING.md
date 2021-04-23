@@ -14,7 +14,7 @@ If you are interested in contributing documentation, please note the following:
 
 [How to build from source.](./BUILDING.md)
 
-<br/>
+<br/> 
 <br/>
 
 # Pull request and git commit guidance
