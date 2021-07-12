@@ -68,9 +68,25 @@ impl InternalModule for RequestExecutor {
     async fn run(&mut self) -> Result<(), Self::Error> {
         while let Some(msg) = self.receiver.recv().await {
             // process
-            // bla bla bla
 
-            //send response
+            // bla bla bla
+            // assume msg preparsed
+            // determine order of operation, uninstall goes first, isntall goes next
+
+            // start calls to plugin
+            // plugin prepare -> open plugin process with parameters
+
+            // plugin uninstall
+
+            // plugin install
+
+            // plugin finalize -> clena and otehr
+
+            // collect exit codes, collect stdouterr
+
+            // prepare response
+
+            // send response
             let message = vec![];
             self.sender.send(message)?
         }
