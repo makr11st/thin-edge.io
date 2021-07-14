@@ -1,9 +1,14 @@
+use crate::message::SoftwareRequestUpdateAction;
+use crate::message::SoftwareRequestUpdateModule;
+use crate::message::SoftwareRequestUpdateStatus;
 use crate::plugin::*;
 
 use crate::software::*;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
+use std::ops::Deref;
 use std::path::PathBuf;
 
 /// The main responsibility of a `Plugins` implementation is to retrieve the appropriate plugin for a given software module.
@@ -31,6 +36,7 @@ pub trait Plugins {
     }
 }
 
+#[derive(Debug)]
 pub struct ExternalPlugins {
     plugin_dir: PathBuf,
     plugin_map: HashMap<String, ExternalPluginCommand>,
@@ -69,13 +75,13 @@ impl ExternalPlugins {
 
     pub fn load(&mut self) -> io::Result<()> {
         self.plugin_map.clear();
-
+        dbg!();
         for maybe_entry in fs::read_dir(&self.plugin_dir)? {
             let entry = maybe_entry?;
             let path = entry.path();
             if path.is_file() {
                 // TODO check the file is exec
-                // TODO check the exec is a plugin
+
                 if let Some(file_name) = path.file_name() {
                     if let Some(plugin_name) = file_name.to_str() {
                         let plugin = ExternalPluginCommand::new(plugin_name, &path);
@@ -84,32 +90,83 @@ impl ExternalPlugins {
                 }
             }
         }
+        dbg!(&self.plugin_map);
 
         Ok(())
     }
-}
 
-/// Any set of plugins can be used as a plugin too.
-impl Plugin for ExternalPlugins {
-    fn list(&self) -> Result<SoftwareList, SoftwareError> {
-        let mut complete_software_list = SoftwareList::new();
-        for (software_type, _) in &self.plugin_map {
+    pub fn empty(&self) -> bool {
+        self.plugin_map.is_empty()
+    }
+
+    fn prepare(&self) -> Result<(), SoftwareError> {
+        todo!()
+    }
+
+    pub fn list(&self) -> Result<SoftwareListHashStore, SoftwareError> {
+        let mut complete_software_list = SoftwareListHashStore::default();
+
+        for software_type in self.plugin_map.keys() {
             let mut plugin_software_list = self.plugin(&software_type)?.list()?;
-            complete_software_list.append(&mut plugin_software_list);
+            match complete_software_list
+                .module_type
+                .entry(software_type.clone())
+            {
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().append(&mut plugin_software_list);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(plugin_software_list);
+                }
+            }
+            // complete_software_list.append(&mut plugin_software_list);
         }
         Ok(complete_software_list)
     }
 
+    fn install(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError> {
+        todo!()
+        // self.plugin(module.software_type.as_str())?.install(module)
+    }
+
+    fn remove(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError> {
+        todo!()
+        // self.plugin(module.software_type.as_str())?.remove(module)
+    }
+
+    fn finalize(&self) -> Result<(), SoftwareError> {
+        todo!()
+    }
+
+    // fn list(&self) -> Result<SoftwareList, SoftwareError> {
+    //     let mut complete_software_list = SoftwareList::new();
+    //     for software_type in self.plugin_map.keys() {
+    //         let mut plugin_software_list = self.plugin(&software_type)?.list()?;
+    //         complete_software_list.append(&mut plugin_software_list);
+    //     }
+    //     dbg!();
+    //     Ok(complete_software_list)
+    // }
+
     fn version(&self, module: &SoftwareModule) -> Result<Option<String>, SoftwareError> {
-        self.plugin(module.software_type.as_str())?.version(module)
+        todo!()
+        // self.plugin(module.software_type.as_str())?.version(module)
     }
 
-    fn install(&self, module: &SoftwareModule) -> Result<(), SoftwareError> {
-        self.plugin(module.software_type.as_str())?.install(module)
-    }
+    // pub fn apply(&self, update: &SoftwareUpdate) -> SoftwareUpdateStatus {
+    //     let result = match update {
+    //         SoftwareUpdate::Install { module } => self.install(&module),
+    //         SoftwareUpdate::UnInstall { module } => self.remove(&module),
+    //     };
 
-    fn uninstall(&self, module: &SoftwareModule) -> Result<(), SoftwareError> {
-        self.plugin(module.software_type.as_str())?
-            .uninstall(module)
+    //     SoftwareUpdateStatus::new(update, result)
+    // }
+    pub fn apply(&self, update: &SoftwareRequestUpdateModule) -> SoftwareRequestUpdateStatus {
+        let result = match update.action {
+            SoftwareRequestUpdateAction::Install => self.install(&update),
+            SoftwareRequestUpdateAction::Remove => self.remove(&update),
+        };
+
+        SoftwareRequestUpdateStatus::new(update, result)
     }
 }

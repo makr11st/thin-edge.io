@@ -1,4 +1,9 @@
+use std::collections::HashMap;
+
+use mqtt_client::Topic;
 use serde::{Deserialize, Serialize};
+
+use crate::message::SoftwareRequestUpdateModule;
 
 pub type SoftwareType = String;
 pub type SoftwareName = String;
@@ -6,9 +11,8 @@ pub type SoftwareVersion = String;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SoftwareModule {
-    #[serde(rename = "type")]
+    #[serde(skip)]
     pub software_type: SoftwareType,
-
     pub name: SoftwareName,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -16,6 +20,32 @@ pub struct SoftwareModule {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+}
+
+pub type SoftwareListHash = HashMap<SoftwareType, Vec<SoftwareModule>>;
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct SoftwareListHashStore {
+    #[serde(rename = "type")]
+    pub module_type: SoftwareListHash,
+}
+
+impl SoftwareListHashStore {
+    pub fn new(software_list: SoftwareListHash) -> Self {
+        Self {
+            module_type: software_list,
+        }
+    }
+}
+
+impl Default for SoftwareListHashStore {
+    fn default() -> Self {
+        Self {
+            module_type: HashMap::new(),
+        }
+    }
 }
 
 pub type SoftwareList = Vec<SoftwareModule>;
@@ -46,13 +76,20 @@ impl Default for SoftwareListStore {
 #[serde(untagged)]
 pub enum SoftwareOperation {
     // A request for the current software list
-    CurrentSoftwareList { list: () },
+    CurrentSoftwareList,
 
     // A sequence of updates to be applied
-    SoftwareUpdates { updates: Vec<SoftwareUpdate> },
+    SoftwareUpdates,
+}
 
-    // The desired software list
-    DesiredSoftwareList { modules: Vec<SoftwareModule> },
+impl From<Topic> for SoftwareOperation {
+    fn from(topic: Topic) -> Self {
+        match topic.name.as_str() {
+            r#"tedge/commands/req/software/list"# => Self::CurrentSoftwareList,
+            r#"tedge/commands/req/software/update"# => Self::SoftwareUpdates,
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -72,10 +109,13 @@ pub enum SoftwareUpdate {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(untagged)]
 pub enum SoftwareOperationStatus {
     SoftwareUpdates { updates: Vec<SoftwareUpdateStatus> },
     DesiredSoftwareList { updates: Vec<SoftwareUpdateStatus> },
-    CurrentSoftwareList { modules: Vec<SoftwareModule> },
+
+    // CurrentSoftwareList { list: Vec<SoftwareModule> },
+    CurrentSoftwareList { list: SoftwareListHashStore },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -148,20 +188,26 @@ pub enum SoftwareError {
     },
 
     #[error("Plugin error for {software_type:?}, reason: {reason:?}")]
-    PluginError {
+    Plugin {
         software_type: SoftwareType,
         reason: String,
     },
 
-    #[error("Fail to install {module:?}")]
-    InstallError {
-        module: SoftwareModule,
+    #[error("Failed to install {module:?}")]
+    Install {
+        module: SoftwareRequestUpdateModule,
         reason: String,
     },
 
-    #[error("Fail to uninstall {module:?}")]
-    UnInstallError {
-        module: SoftwareModule,
+    #[error("Failed to prepare")]
+    Prepare { reason: String },
+
+    #[error("Failed to finalize")]
+    Finalize { reason: String },
+
+    #[error("Failed to uninstall {module:?}")]
+    Uninstall {
+        module: SoftwareRequestUpdateModule,
         reason: String,
     },
 }

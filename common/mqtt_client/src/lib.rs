@@ -607,7 +607,7 @@ pub struct Message {
     payload: Payload,
     pub qos: QoS,
     pkid: u16,
-    retain: bool,
+    pub retain: bool,
 }
 
 impl Message {
@@ -626,6 +626,13 @@ impl Message {
 
     pub fn qos(self, qos: QoS) -> Self {
         Self { qos, ..self }
+    }
+
+    pub fn retain(self) -> Self {
+        Self {
+            retain: true,
+            ..self
+        }
     }
 
     // trims the trailing null char if one exists

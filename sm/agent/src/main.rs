@@ -2,14 +2,15 @@ use crate::component::TEdgeComponent;
 
 mod component;
 mod error;
-mod sm_manager;
+mod sm_agent;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), anyhow::Error> {
     initialise_logging();
 
-    let component = sm_manager::SmManager::new("abc");
+    let component = sm_agent::SmAgent::new("abc");
     component.start().await
+    // Ok(())
 }
 
 fn initialise_logging() {
