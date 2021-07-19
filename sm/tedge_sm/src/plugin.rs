@@ -1,5 +1,6 @@
 use crate::message::{
-    SoftwareRequestUpdateAction, SoftwareRequestUpdateModule, SoftwareRequestUpdateStatus,
+    SoftwareListModule, SoftwareListResponseList, SoftwareRequestUpdateAction,
+    SoftwareRequestUpdateModule, SoftwareRequestUpdateStatus,
 };
 use crate::software::*;
 use std::iter::Iterator;
@@ -11,7 +12,7 @@ pub trait Plugin {
     fn install(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError>;
     fn remove(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError>;
     fn finalize(&self) -> Result<(), SoftwareError>;
-    fn list(&self) -> Result<SoftwareList, SoftwareError>;
+    fn list(&self) -> Result<SoftwareListResponseList, SoftwareError>;
     fn version(
         &self,
         module: &SoftwareRequestUpdateModule,
@@ -159,10 +160,10 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn list(&self) -> Result<SoftwareList, SoftwareError> {
+    fn list(&self) -> Result<SoftwareListResponseList, SoftwareError> {
         let command = self.command(LIST, None)?;
         let output = self.execute(command)?;
-        let mut software_list = SoftwareList::new();
+        let mut software_list = Vec::new();
         let mystr = output.stdout;
         mystr
             .split(|n: &u8| n.is_ascii_whitespace())
@@ -170,12 +171,16 @@ impl Plugin for ExternalPluginCommand {
             .for_each(|split: &[u8]| {
                 let software_json_line = std::str::from_utf8(split).unwrap();
                 let software_module =
-                    serde_json::from_str::<SoftwareModule>(software_json_line).unwrap();
+                    serde_json::from_str::<SoftwareListModule>(software_json_line).unwrap();
                 software_list.push(software_module);
             });
 
         if output.status.success() {
-            Ok(software_list)
+            let list_software_list = SoftwareListResponseList {
+                plugin_type: self.name.clone(),
+                modules: software_list,
+            };
+            Ok(list_software_list)
         } else {
             Err(SoftwareError::Plugin {
                 software_type: self.name.clone(),

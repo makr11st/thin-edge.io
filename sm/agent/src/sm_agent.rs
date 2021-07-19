@@ -113,10 +113,10 @@ impl SmAgent {
                     };
                     dbg!(&request);
 
-                    let response = SoftwareResponseList {
+                    let response = SoftwareListResponse {
                         id: request.id,
                         status: SoftwareOperationResultStatus::Successful,
-                        list: SoftwareOperationStatus::CurrentSoftwareList { list: status },
+                        list: status,
                     };
 
                     // * avoid alloc if possible
@@ -178,9 +178,10 @@ impl SmAgent {
                                 .await?;
                         };
 
-                        'sta: for module in software_list_type.modules {
+                        let res = for module in software_list_type.modules {
                             dbg!();
                             dbg!(&module);
+
                             match module.action {
                                 SoftwareRequestUpdateAction::Install => {
                                     if let Err(e) = plugin.install(&module) {
@@ -204,37 +205,19 @@ impl SmAgent {
                                                 response.to_bytes()?,
                                             ))
                                             .await?;
-                                        break;
+                                        break 'main_list;
                                     }
                                 }
                             }
-                        }
+                        };
 
                         let () = plugin.finalize()?;
-
-                        // software_list_type.modules.into_iter().for_each(|module| {
-                        //     plugins.apply(&module);
-                        // });
-
-                        // let blocking_task =
-                        //     tokio::task::spawn_blocking(move || plugins.apply(&module));
-                        // let status: SoftwareUpdateStatus = blocking_task.await?;
                     }
 
-                    // for update in &updates {
-                    //     let status = SoftwareUpdateStatus::scheduled(update);
-                    //     let json = serde_json::to_string(&status)?;
-                    //     let _ = mqtt.publish(Message::new(&response_topic, json)).await?;
-                    // }
+                    let acquire_list = tokio::task::spawn_blocking(move || plugins.list());
+                    let status = acquire_list.await??;
 
-                    // for update in updates {
-                    //     let plugins = plugins.clone();
-                    //     let blocking_task =
-                    //         tokio::task::spawn_blocking(move || plugins.apply(&update));
-                    //     let status: SoftwareUpdateStatus = blocking_task.await?;
-                    //     let json = serde_json::to_string(&status)?;
-                    //     let _ = mqtt.publish(Message::new(&response_topic, json)).await?;
-                    // }
+                    response.current_software_list = Some(status);
                 }
 
                 // }

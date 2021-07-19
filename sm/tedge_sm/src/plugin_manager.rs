@@ -1,6 +1,7 @@
-use crate::message::SoftwareRequestUpdateAction;
-use crate::message::SoftwareRequestUpdateModule;
-use crate::message::SoftwareRequestUpdateStatus;
+use crate::message::{
+    ListSoftwareListResponseList, SoftwareListResponseList, SoftwareRequestUpdateAction,
+    SoftwareRequestUpdateModule, SoftwareRequestUpdateStatus,
+};
 use crate::plugin::*;
 
 use crate::software::*;
@@ -103,22 +104,12 @@ impl ExternalPlugins {
         todo!()
     }
 
-    pub fn list(&self) -> Result<SoftwareListHashStore, SoftwareError> {
-        let mut complete_software_list = SoftwareListHashStore::default();
-
+    pub fn list(&self) -> Result<ListSoftwareListResponseList, SoftwareError> {
+        let mut complete_software_list = Vec::new();
+        let mut modules_software_list = Vec::new();
         for software_type in self.plugin_map.keys() {
             let mut plugin_software_list = self.plugin(&software_type)?.list()?;
-            match complete_software_list
-                .module_type
-                .entry(software_type.clone())
-            {
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().append(&mut plugin_software_list);
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert(plugin_software_list);
-                }
-            }
+            modules_software_list.push(plugin_software_list);
             // complete_software_list.append(&mut plugin_software_list);
         }
         Ok(complete_software_list)

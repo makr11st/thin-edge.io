@@ -17,6 +17,7 @@ use url::Url;
 // }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct SoftwareRequestList {
     pub id: usize,
 }
@@ -65,6 +66,16 @@ pub struct SoftwareRequestUpdateList {
     pub modules: Vec<SoftwareRequestUpdateModule>,
 }
 
+// impl From<SoftwareListHashStore> for SoftwareRequestUpdateList {
+//     fn from(list: SoftwareListHashStore) -> Self {
+//         let plugin_type = list.module_type;
+//         Self {
+//             plugin_type: (),
+//             modules: (),
+//         }
+//     }
+// }
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -73,6 +84,26 @@ pub struct SoftwareRequestUpdateModule {
     pub version: Option<SoftwareVersion>,
     pub action: SoftwareRequestUpdateAction,
     pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct SoftwareListResponseList {
+    #[serde(rename = "type")]
+    pub plugin_type: SoftwareType,
+    pub modules: Vec<SoftwareListModule>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+// #[serde(deny_unknown_fields)]
+pub struct SoftwareListModule {
+    #[serde(skip)]
+    #[serde(rename = "type")]
+    pub software_type: SoftwareType,
+    pub name: SoftwareName,
+    pub version: Option<SoftwareVersion>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
@@ -143,7 +174,7 @@ pub struct SoftwareResponseUpdateStatus {
     pub status: SoftwareOperationResultStatus,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub current_software_list: Option<Vec<SoftwareRequestUpdateList>>,
+    pub current_software_list: Option<ListSoftwareListResponseList>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
@@ -163,17 +194,19 @@ impl SoftwareResponseUpdateStatus {
     }
 }
 
+pub type ListSoftwareListResponseList = Vec<SoftwareListResponseList>;
+
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct SoftwareResponseList {
+pub struct SoftwareListResponse {
     pub id: usize,
 
     pub status: SoftwareOperationResultStatus,
 
-    #[serde(flatten)]
-    pub list: SoftwareOperationStatus,
+    // #[serde(flatten)]
+    pub list: ListSoftwareListResponseList,
 }
 
-impl SoftwareResponseList {
+impl SoftwareListResponse {
     pub fn from_json(json_str: &str) -> Result<Self, SoftwareError> {
         Ok(serde_json::from_str(json_str)?)
     }
