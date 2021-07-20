@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
+use crate::message::SoftwareRequestUpdateModule;
 use mqtt_client::Topic;
 use serde::{Deserialize, Serialize};
-
-use crate::message::SoftwareRequestUpdateModule;
+use std::collections::HashMap;
 
 pub type SoftwareType = String;
 pub type SoftwareName = String;
@@ -75,11 +73,11 @@ impl Default for SoftwareListStore {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum SoftwareOperation {
-    // A request for the current software list
     CurrentSoftwareList,
-
-    // A sequence of updates to be applied
     SoftwareUpdates,
+
+    #[serde(skip)]
+    UnknownOperation,
 }
 
 impl From<Topic> for SoftwareOperation {
@@ -87,7 +85,7 @@ impl From<Topic> for SoftwareOperation {
         match topic.name.as_str() {
             r#"tedge/commands/req/software/list"# => Self::CurrentSoftwareList,
             r#"tedge/commands/req/software/update"# => Self::SoftwareUpdates,
-            _ => todo!(),
+            _ => Self::UnknownOperation,
         }
     }
 }
@@ -162,17 +160,41 @@ impl SoftwareUpdateStatus {
 
 #[derive(thiserror::Error, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum SoftwareError {
+    #[error("Failed to finalize")]
+    Finalize { reason: String },
+
+    #[error("Failed to install {module:?}")]
+    Install {
+        module: SoftwareRequestUpdateModule,
+        reason: String,
+    },
+
     #[error("JSON parse error: {reason:?}")]
     ParseError { reason: String },
 
-    #[error("Unknown software type: {software_type:?}")]
-    UnknownSoftwareType { software_type: SoftwareType },
+    #[error("Plugin error for {software_type:?}, reason: {reason:?}")]
+    Plugin {
+        software_type: SoftwareType,
+        reason: String,
+    },
+
+    #[error("Failed to prepare")]
+    Prepare { reason: String },
+
+    #[error("Failed to uninstall {module:?}")]
+    Uninstall {
+        module: SoftwareRequestUpdateModule,
+        reason: String,
+    },
 
     #[error("Unknown {software_type:?} module: {name:?}")]
     UnknownModule {
         software_type: SoftwareType,
         name: SoftwareName,
     },
+
+    #[error("Unknown software type: {software_type:?}")]
+    UnknownSoftwareType { software_type: SoftwareType },
 
     #[error("Unknown {software_type:?} version: {name:?} - {version:?}")]
     UnknownVersion {
@@ -185,30 +207,6 @@ pub enum SoftwareError {
     WrongModuleType {
         actual_type: SoftwareType,
         expected_type: SoftwareType,
-    },
-
-    #[error("Plugin error for {software_type:?}, reason: {reason:?}")]
-    Plugin {
-        software_type: SoftwareType,
-        reason: String,
-    },
-
-    #[error("Failed to install {module:?}")]
-    Install {
-        module: SoftwareRequestUpdateModule,
-        reason: String,
-    },
-
-    #[error("Failed to prepare")]
-    Prepare { reason: String },
-
-    #[error("Failed to finalize")]
-    Finalize { reason: String },
-
-    #[error("Failed to uninstall {module:?}")]
-    Uninstall {
-        module: SoftwareRequestUpdateModule,
-        reason: String,
     },
 }
 

@@ -2088,8 +2088,11 @@ dependencies = [
  "tedge_config",
  "tedge_sm_lib",
  "tedge_users",
+ "tedge_utils",
+ "tempfile",
  "thiserror",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2166,6 +2169,16 @@ version = "0.2.2"
 dependencies = [
  "thiserror",
  "users",
+]
+
+[[package]]
+name = "tedge_utils"
+version = "0.2.2"
+dependencies = [
+ "assert_matches",
+ "tempfile",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

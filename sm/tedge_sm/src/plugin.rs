@@ -1,11 +1,15 @@
-use crate::message::{
-    SoftwareListModule, SoftwareListResponseList, SoftwareRequestUpdateAction,
-    SoftwareRequestUpdateModule, SoftwareRequestUpdateStatus,
+use crate::{
+    message::{
+        SoftwareListModule, SoftwareListResponseList, SoftwareRequestUpdateAction,
+        SoftwareRequestUpdateModule, SoftwareRequestUpdateStatus,
+    },
+    software::*,
 };
-use crate::software::*;
-use std::iter::Iterator;
-use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::{
+    iter::Iterator,
+    path::PathBuf,
+    process::{Command, Output, Stdio},
+};
 
 pub trait Plugin {
     fn prepare(&self) -> Result<(), SoftwareError>;
@@ -41,20 +45,6 @@ impl ExternalPluginCommand {
             path: path.into(),
         }
     }
-
-    // pub fn check_module_type(
-    //     &self,
-    //     module: &SoftwareRequestUpdateModule,
-    // ) -> Result<(), SoftwareError> {
-    //     if module.software_type == self.name {
-    //         Ok(())
-    //     } else {
-    //         Err(SoftwareError::WrongModuleType {
-    //             actual_type: self.name.clone(),
-    //             expected_type: module.software_type.clone(),
-    //         })
-    //     }
-    // }
 
     pub fn command(
         &self,
@@ -165,6 +155,7 @@ impl Plugin for ExternalPluginCommand {
         let output = self.execute(command)?;
         let mut software_list = Vec::new();
         let mystr = output.stdout;
+
         mystr
             .split(|n: &u8| n.is_ascii_whitespace())
             .filter(|split| !split.is_empty())
@@ -178,8 +169,9 @@ impl Plugin for ExternalPluginCommand {
         if output.status.success() {
             let list_software_list = SoftwareListResponseList {
                 plugin_type: self.name.clone(),
-                modules: software_list,
+                list: software_list,
             };
+            dbg!(&list_software_list);
             Ok(list_software_list)
         } else {
             Err(SoftwareError::Plugin {

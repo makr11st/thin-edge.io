@@ -1,6 +1,5 @@
 use crate::software::*;
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 // trait Jsonify {
 //     fn from_json(json_str: &str) -> Result<Self, SoftwareError> {
@@ -63,26 +62,21 @@ impl SoftwareRequestUpdate {
 pub struct SoftwareRequestUpdateList {
     #[serde(rename = "type")]
     pub plugin_type: SoftwareType,
-    pub modules: Vec<SoftwareRequestUpdateModule>,
+    pub list: Vec<SoftwareRequestUpdateModule>,
 }
-
-// impl From<SoftwareListHashStore> for SoftwareRequestUpdateList {
-//     fn from(list: SoftwareListHashStore) -> Self {
-//         let plugin_type = list.module_type;
-//         Self {
-//             plugin_type: (),
-//             modules: (),
-//         }
-//     }
-// }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct SoftwareRequestUpdateModule {
     pub name: SoftwareName,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<SoftwareVersion>,
+
     pub action: SoftwareRequestUpdateAction,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
@@ -92,7 +86,7 @@ pub struct SoftwareRequestUpdateModule {
 pub struct SoftwareListResponseList {
     #[serde(rename = "type")]
     pub plugin_type: SoftwareType,
-    pub modules: Vec<SoftwareListModule>,
+    pub list: Vec<SoftwareListModule>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
@@ -100,7 +94,6 @@ pub struct SoftwareListResponseList {
 // #[serde(deny_unknown_fields)]
 pub struct SoftwareListModule {
     #[serde(skip)]
-    #[serde(rename = "type")]
     pub software_type: SoftwareType,
     pub name: SoftwareName,
     pub version: Option<SoftwareVersion>,
@@ -174,10 +167,13 @@ pub struct SoftwareResponseUpdateStatus {
     pub status: SoftwareOperationResultStatus,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub current_software_list: Option<ListSoftwareListResponseList>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
+    pub failures: Option<ListSoftwareListResponseList>,
 }
 
 impl SoftwareResponseUpdateStatus {
@@ -192,6 +188,8 @@ impl SoftwareResponseUpdateStatus {
     pub fn to_bytes(&self) -> Result<Vec<u8>, SoftwareError> {
         Ok(serde_json::to_vec(self)?)
     }
+
+    // pub fn add_failure(&self, module: ) -> Result<(), SoftwareError> {}
 }
 
 pub type ListSoftwareListResponseList = Vec<SoftwareListResponseList>;
@@ -225,46 +223,64 @@ mod tests {
     use super::*;
 
     #[test]
-    fn serialize_and_parse_software_updates() {
-        let request = SoftwareRequestList {
-            id: 42,
-            operation: SoftwareOperation::SoftwareUpdates {
-                updates: vec![
-                    SoftwareUpdate::Install {
-                        module: SoftwareModule {
-                            software_type: String::from("default"),
-                            name: String::from("collectd-core"),
-                            version: None,
-                            url: None,
-                        },
-                    },
-                    SoftwareUpdate::Install {
-                        module: SoftwareModule {
-                            software_type: String::from("debian"),
-                            name: String::from("ripgrep"),
-                            version: None,
-                            url: None,
-                        },
-                    },
-                    SoftwareUpdate::UnInstall {
-                        module: SoftwareModule {
-                            software_type: String::from("default"),
-                            name: String::from("hexyl"),
-                            version: None,
-                            url: None,
-                        },
-                    },
-                ],
-            },
+    fn serde_software_request_list() {
+        let request = SoftwareRequestList { id: 1234 };
+        let expected_json = r#"{"id":1234}"#;
+
+        let actual_json = request.to_json().expect("Failed to serialize");
+
+        assert_eq!(actual_json, expected_json);
+
+        let de_request =
+            SoftwareRequestList::from_json(actual_json.as_str()).expect("failed to deserialize");
+        assert_eq!(request, de_request);
+    }
+
+    #[test]
+    fn serde_software_request_update() {
+        let debian_module1 = SoftwareRequestUpdateModule {
+            name: "debian1".into(),
+            version: Some("0.0.1".into()),
+            action: SoftwareRequestUpdateAction::Install,
+            url: None,
         };
 
-        let expected_json = r#"{"id":"42","updates":[{"action":"install","type":"default","name":"collectd-core"},{"action":"install","type":"debian","name":"ripgrep"},{"action":"uninstall","type":"default","name":"hexyl"}]}"#;
+        let debian_module2 = SoftwareRequestUpdateModule {
+            name: "debian2".into(),
+            version: Some("0.0.2".into()),
+            action: SoftwareRequestUpdateAction::Install,
+            url: None,
+        };
+
+        let debian_list = SoftwareRequestUpdateList {
+            plugin_type: "debian".into(),
+            list: vec![debian_module1, debian_module2],
+        };
+
+        let docker_module1 = SoftwareRequestUpdateModule {
+            name: "docker1".into(),
+            version: Some("0.0.1".into()),
+            action: SoftwareRequestUpdateAction::Remove,
+            url: Some("test.com".into()),
+        };
+
+        let docker_list = SoftwareRequestUpdateList {
+            plugin_type: "docker".into(),
+            list: vec![docker_module1],
+        };
+
+        let request = SoftwareRequestUpdate {
+            id: 1234,
+            update_list: vec![debian_list, docker_list],
+        };
+
+        let expected_json = r#"{"id":1234,"updateList":[{"type":"debian","list":[{"name":"debian1","version":"0.0.1","action":"install"},{"name":"debian2","version":"0.0.2","action":"install"}]},{"type":"docker","list":[{"name":"docker1","version":"0.0.1","action":"remove","url":"test.com"}]}]}"#;
 
         let actual_json = request.to_json().expect("Fail to serialize the request");
         assert_eq!(actual_json, expected_json);
 
         let parsed_request =
-            SoftwareRequestList::from_json(&actual_json).expect("Fail to parse the json request");
+            SoftwareRequestUpdate::from_json(&actual_json).expect("Fail to parse the json request");
         assert_eq!(parsed_request, request);
     }
 
@@ -273,8 +289,8 @@ mod tests {
         let status = SoftwareUpdateStatus {
             update: SoftwareUpdate::Install {
                 module: SoftwareModule {
-                    software_type: String::from("default"),
-                    name: String::from("collectd-core"),
+                    software_type: "".into(),
+                    name: "test_core".into(),
                     version: None,
                     url: None,
                 },
@@ -282,7 +298,8 @@ mod tests {
             status: UpdateStatus::Success,
         };
 
-        let expected_json = r#"{"update":{"action":"install","type":"default","name":"collectd-core"},"status":"Success"}"#;
+        let expected_json =
+            r#"{"update":{"action":"install","name":"test_core"},"status":"Success"}"#;
         let actual_json = serde_json::to_string(&status).expect("Fail to serialize a status");
         assert_eq!(actual_json, expected_json);
 
@@ -292,18 +309,48 @@ mod tests {
     }
 
     #[test]
-    fn serialize_and_parse_software_list() {
-        let request = SoftwareRequestList {
-            id: String::from("42"),
-            operation: SoftwareOperation::CurrentSoftwareList { list: () },
+    fn serde_software_list_empty_successful() {
+        let request = SoftwareListResponse {
+            id: 1234,
+            status: SoftwareOperationResultStatus::Successful,
+            list: vec![],
         };
-        let expected_json = r#"{"id":"42","list":null}"#;
+
+        let expected_json = r#"{"id":1234,"status":"successful","list":[]}"#;
 
         let actual_json = request.to_json().expect("Fail to serialize the request");
         assert_eq!(actual_json, expected_json);
 
         let parsed_request =
-            SoftwareRequestList::from_json(&actual_json).expect("Fail to parse the json request");
+            SoftwareListResponse::from_json(&actual_json).expect("Fail to parse the json request");
+        assert_eq!(parsed_request, request);
+    }
+
+    #[test]
+    fn serde_software_list_some_modules_successful() {
+        let module1 = SoftwareListModule {
+            software_type: "".into(),
+            name: "debian1".into(),
+            version: Some("0.0.1".into()),
+        };
+
+        let docker_module1 = SoftwareListResponseList {
+            plugin_type: "debian".into(),
+            list: vec![module1],
+        };
+
+        let request = SoftwareListResponse {
+            id: 1234,
+            status: SoftwareOperationResultStatus::Successful,
+            list: vec![docker_module1],
+        };
+        let expected_json = r#"{"id":1234,"status":"successful","list":[{"type":"debian","list":[{"name":"debian1","version":"0.0.1"}]}]}"#;
+
+        let actual_json = request.to_json().expect("Fail to serialize the request");
+        assert_eq!(actual_json, expected_json);
+
+        let parsed_request =
+            SoftwareListResponse::from_json(&actual_json).expect("Fail to parse the json request");
         assert_eq!(parsed_request, request);
     }
 }
