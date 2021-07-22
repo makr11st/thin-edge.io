@@ -49,6 +49,7 @@ pub enum AgentError {
 pub enum StateError {
     #[error("a")]
     State,
+
     #[error(transparent)]
     TOMLParseError(#[from] toml::de::Error),
 
