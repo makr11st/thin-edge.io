@@ -1,4 +1,7 @@
-use crate::{error::AgentError, state::AgentStateRepository};
+use crate::{
+    error::{AgentError, StateError},
+    state::{AgentStateRepository, StateRepository},
+};
 use log::{debug, error, info};
 use mqtt_client::{Client, Message, MqttClient, Topic, TopicFilter};
 use std::sync::Arc;
@@ -79,7 +82,12 @@ impl SmAgent {
             }
         });
 
-        // let persistance_store = AgentStateRepository::new();
+        // let persistance_store = AgentStateRepository::new(&self.config_location);
+        // let store = match persistance_store.load().await {
+        //     Ok(state) => state,
+        //     Err(StateError::IOError(_)) => todo!(),
+        //     Err(_) => (),
+        // };
         // * Maybe it would be nice if mapper/registry responds
         let () = publish_capabilities(&mqtt).await?;
 
