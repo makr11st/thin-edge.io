@@ -1,7 +1,7 @@
 use crate::message::SoftwareRequestUpdateModule;
 use mqtt_client::Topic;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 pub type SoftwareType = String;
 pub type SoftwareName = String;
@@ -20,55 +20,55 @@ pub struct SoftwareModule {
     pub url: Option<String>,
 }
 
-pub type SoftwareListHash = HashMap<SoftwareType, Vec<SoftwareModule>>;
+// pub type SoftwareListHash = HashMap<SoftwareType, Vec<SoftwareModule>>;
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
-pub struct SoftwareListHashStore {
-    #[serde(rename = "type")]
-    pub module_type: SoftwareListHash,
-}
+// #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+// #[serde(rename_all = "camelCase")]
+// #[serde(deny_unknown_fields)]
+// pub struct SoftwareListHashStore {
+//     #[serde(rename = "type")]
+//     pub module_type: SoftwareListHash,
+// }
 
-impl SoftwareListHashStore {
-    pub fn new(software_list: SoftwareListHash) -> Self {
-        Self {
-            module_type: software_list,
-        }
-    }
-}
+// impl SoftwareListHashStore {
+//     pub fn new(software_list: SoftwareListHash) -> Self {
+//         Self {
+//             module_type: software_list,
+//         }
+//     }
+// }
 
-impl Default for SoftwareListHashStore {
-    fn default() -> Self {
-        Self {
-            module_type: HashMap::new(),
-        }
-    }
-}
+// impl Default for SoftwareListHashStore {
+//     fn default() -> Self {
+//         Self {
+//             module_type: HashMap::new(),
+//         }
+//     }
+// }
 
 pub type SoftwareList = Vec<SoftwareModule>;
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
-pub struct SoftwareListStore {
-    // making it pub just not have to implement push for now.
-    pub software_list: Vec<SoftwareModule>,
-}
+// #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+// #[serde(rename_all = "camelCase")]
+// #[serde(deny_unknown_fields)]
+// pub struct SoftwareListStore {
+//     // making it pub just not have to implement push for now.
+//     pub software_list: Vec<SoftwareModule>,
+// }
 
-impl SoftwareListStore {
-    pub fn new(software_list: Vec<SoftwareModule>) -> Self {
-        Self { software_list }
-    }
-}
+// impl SoftwareListStore {
+//     pub fn new(software_list: Vec<SoftwareModule>) -> Self {
+//         Self { software_list }
+//     }
+// }
 
-impl Default for SoftwareListStore {
-    fn default() -> Self {
-        Self {
-            software_list: vec![],
-        }
-    }
-}
+// impl Default for SoftwareListStore {
+//     fn default() -> Self {
+//         Self {
+//             software_list: vec![],
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
@@ -85,6 +85,44 @@ impl From<Topic> for SoftwareOperation {
         match topic.name.as_str() {
             r#"tedge/commands/req/software/list"# => Self::CurrentSoftwareList,
             r#"tedge/commands/req/software/update"# => Self::SoftwareUpdates,
+            _ => Self::UnknownOperation,
+        }
+    }
+}
+
+impl From<SoftwareOperation> for Topic {
+    fn from(operation: SoftwareOperation) -> Self {
+        match operation {
+            SoftwareOperation::CurrentSoftwareList => {
+                Topic::new("tedge/commands/req/software/list").expect("This is not a topic.")
+            }
+            SoftwareOperation::SoftwareUpdates => {
+                Topic::new("tedge/commands/req/software/update").expect("This is not a topic.")
+            }
+            SoftwareOperation::UnknownOperation => {
+                Topic::new("tedge/commands/unsupported_operation").expect("This is not a topic.")
+            }
+        }
+    }
+}
+
+impl FromStr for SoftwareOperation {
+    type Err = SoftwareError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            r#"list"# => Ok(Self::CurrentSoftwareList),
+            r#"update"# => Ok(Self::SoftwareUpdates),
+            _ => Ok(Self::UnknownOperation),
+        }
+    }
+}
+
+impl From<String> for SoftwareOperation {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            r#"list"# => Self::CurrentSoftwareList,
+            r#"update"# => Self::SoftwareUpdates,
             _ => Self::UnknownOperation,
         }
     }
@@ -111,9 +149,8 @@ pub enum SoftwareUpdate {
 pub enum SoftwareOperationStatus {
     SoftwareUpdates { updates: Vec<SoftwareUpdateStatus> },
     DesiredSoftwareList { updates: Vec<SoftwareUpdateStatus> },
-
     // CurrentSoftwareList { list: Vec<SoftwareModule> },
-    CurrentSoftwareList { list: SoftwareListHashStore },
+    // CurrentSoftwareList { list: SoftwareListHashStore },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

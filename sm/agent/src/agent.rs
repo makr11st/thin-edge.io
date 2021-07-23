@@ -1,10 +1,10 @@
 use crate::{
     error::{AgentError, StateError},
-    state::{AgentStateRepository, StateRepository},
+    state::{AgentStateRepository, State, StateRepository},
 };
 use log::{debug, error, info};
 use mqtt_client::{Client, Message, MqttClient, Topic, TopicFilter};
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use tedge_config::TEdgeConfigLocation;
 use tedge_sm_lib::{message::*, plugin::*, plugin_manager::*, software::*};
 use tedge_users::{UserManager, ROOT_USER};
@@ -82,12 +82,41 @@ impl SmAgent {
             }
         });
 
-        // let persistance_store = AgentStateRepository::new(&self.config_location);
-        // let store = match persistance_store.load().await {
-        //     Ok(state) => state,
-        //     Err(StateError::IOError(_)) => todo!(),
-        //     Err(_) => (),
-        // };
+        let persistance_store = AgentStateRepository::new(&self.config_location);
+        if let State {
+            operation_id: Some(id),
+            operation: Some(operation_string),
+        } = match persistance_store.load().await {
+            Ok(state) => state,
+            Err(_) => State {
+                operation_id: None,
+                operation: None,
+            },
+        } {
+            let operation = SoftwareOperation::from_str(operation_string.as_str())?;
+            let response = SoftwareResponseUpdateStatus {
+                id,
+                status: SoftwareOperationResultStatus::Failed,
+                reason: Some("unfinished operation request".into()),
+                current_software_list: None,
+                failures: None,
+            };
+            let topic = match operation {
+                SoftwareOperation::CurrentSoftwareList => &self.config.response_topic_list,
+
+                SoftwareOperation::SoftwareUpdates => &self.config.response_topic_update,
+
+                SoftwareOperation::UnknownOperation => {
+                    error!("UnknownOperation to in store.");
+                    &self.config.errors_topic
+                }
+            };
+
+            let _ = mqtt
+                .publish(Message::new(topic, response.to_bytes()?))
+                .await?;
+        }
+
         // * Maybe it would be nice if mapper/registry responds
         let () = publish_capabilities(&mqtt).await?;
 

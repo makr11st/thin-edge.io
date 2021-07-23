@@ -6,6 +6,7 @@ use std::{
     str::FromStr,
 };
 use tedge_config::TEdgeConfigLocation;
+use tedge_sm_lib::software::SoftwareOperation;
 use tokio::{fs, io::AsyncWriteExt};
 
 #[derive(Debug)]
@@ -18,6 +19,7 @@ pub trait StateRepository<T> {
     type Error;
     async fn load(&self) -> Result<T, Self::Error>;
     async fn store(&self, state: &T) -> Result<(), Self::Error>;
+    async fn clear(&self) -> Result<T, Self::Error>;
 }
 
 #[async_trait]
@@ -48,6 +50,16 @@ impl StateRepository<State> for AgentStateRepository {
 
         Ok(())
     }
+
+    async fn clear(&self) -> Result<State, Self::Error> {
+        let state = State {
+            operation_id: None,
+            operation: None,
+        };
+        let () = self.store(&state).await?;
+
+        Ok(state)
+    }
 }
 
 impl AgentStateRepository {
@@ -63,6 +75,7 @@ impl AgentStateRepository {
 #[serde(deny_unknown_fields)]
 pub struct State {
     pub operation_id: Option<usize>,
+    pub operation: Option<String>,
 }
 
 async fn atomically_write_file(
@@ -93,6 +106,7 @@ async fn atomically_write_file(
 mod tests {
     use crate::state::{atomically_write_file, AgentStateRepository, State, StateRepository};
 
+    use tedge_sm_lib::software::SoftwareOperation;
     use tempfile::{tempdir, NamedTempFile};
 
     #[tokio::test]
@@ -136,7 +150,7 @@ mod tests {
         let _ = tokio::fs::create_dir(temp_dir.path().join(".agent/")).await;
         let destination_path = temp_dir.path().join(".agent/software");
 
-        let content = "operation_id = 1234";
+        let content = "operation_id = 1234\noperation = \"list\"";
 
         let _ = tokio::fs::write(destination_path, content.as_bytes()).await;
 
@@ -152,7 +166,8 @@ mod tests {
         assert_eq!(
             data,
             State {
-                operation_id: Some(1234)
+                operation_id: Some(1234),
+                operation: Some("list".into()),
             }
         );
     }
@@ -177,7 +192,13 @@ mod tests {
         let repo = AgentStateRepository::new(&config);
 
         let data = repo.load().await.unwrap();
-        assert_eq!(data, State { operation_id: None });
+        assert_eq!(
+            data,
+            State {
+                operation_id: None,
+                operation: None
+            }
+        );
     }
 
     #[tokio::test]
@@ -201,12 +222,13 @@ mod tests {
 
         repo.store(&State {
             operation_id: Some(1234),
+            operation: Some("list".into()),
         })
         .await
         .unwrap();
 
         let data = tokio::fs::read_to_string(destination_path).await.unwrap();
 
-        assert_eq!(data, "operation_id = 1234\n");
+        assert_eq!(data, "operation_id = 1234\noperation = \'list\'\n");
     }
 }
