@@ -1,7 +1,7 @@
 use crate::message::SoftwareRequestUpdateModule;
 use mqtt_client::Topic;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 pub type SoftwareType = String;
 pub type SoftwareName = String;
@@ -20,56 +20,7 @@ pub struct SoftwareModule {
     pub url: Option<String>,
 }
 
-// pub type SoftwareListHash = HashMap<SoftwareType, Vec<SoftwareModule>>;
-
-// #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-// #[serde(rename_all = "camelCase")]
-// #[serde(deny_unknown_fields)]
-// pub struct SoftwareListHashStore {
-//     #[serde(rename = "type")]
-//     pub module_type: SoftwareListHash,
-// }
-
-// impl SoftwareListHashStore {
-//     pub fn new(software_list: SoftwareListHash) -> Self {
-//         Self {
-//             module_type: software_list,
-//         }
-//     }
-// }
-
-// impl Default for SoftwareListHashStore {
-//     fn default() -> Self {
-//         Self {
-//             module_type: HashMap::new(),
-//         }
-//     }
-// }
-
-pub type SoftwareList = Vec<SoftwareModule>;
-
-// #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-// #[serde(rename_all = "camelCase")]
-// #[serde(deny_unknown_fields)]
-// pub struct SoftwareListStore {
-//     // making it pub just not have to implement push for now.
-//     pub software_list: Vec<SoftwareModule>,
-// }
-
-// impl SoftwareListStore {
-//     pub fn new(software_list: Vec<SoftwareModule>) -> Self {
-//         Self { software_list }
-//     }
-// }
-
-// impl Default for SoftwareListStore {
-//     fn default() -> Self {
-//         Self {
-//             software_list: vec![],
-//         }
-//     }
-// }
-
+/// Variants of supported software operations.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum SoftwareOperation {
@@ -149,8 +100,6 @@ pub enum SoftwareUpdate {
 pub enum SoftwareOperationStatus {
     SoftwareUpdates { updates: Vec<SoftwareUpdateStatus> },
     DesiredSoftwareList { updates: Vec<SoftwareUpdateStatus> },
-    // CurrentSoftwareList { list: Vec<SoftwareModule> },
-    // CurrentSoftwareList { list: SoftwareListHashStore },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 use tedge_config::TEdgeConfigLocation;
-use tedge_sm_lib::software::SoftwareOperation;
+
 use tokio::{fs, io::AsyncWriteExt};
 
 #[derive(Debug)]
@@ -106,7 +106,6 @@ async fn atomically_write_file(
 mod tests {
     use crate::state::{atomically_write_file, AgentStateRepository, State, StateRepository};
 
-    use tedge_sm_lib::software::SoftwareOperation;
     use tempfile::{tempdir, NamedTempFile};
 
     #[tokio::test]

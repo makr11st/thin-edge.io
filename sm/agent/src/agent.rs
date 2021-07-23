@@ -1,5 +1,5 @@
 use crate::{
-    error::{AgentError, StateError},
+    error::AgentError,
     state::{AgentStateRepository, State, StateRepository},
 };
 use log::{debug, error, info};
@@ -49,6 +49,7 @@ pub struct SmAgent {
     name: String,
     user_manager: UserManager,
     config_location: TEdgeConfigLocation,
+    persistance_store: AgentStateRepository,
 }
 
 impl SmAgent {
@@ -57,11 +58,14 @@ impl SmAgent {
         user_manager: UserManager,
         config_location: TEdgeConfigLocation,
     ) -> Self {
+        let persistance_store = AgentStateRepository::new(&config_location);
+
         Self {
             config: SmAgentConfig::default(),
             name: name.into(),
             user_manager,
             config_location,
+            persistance_store,
         }
     }
 
@@ -82,40 +86,7 @@ impl SmAgent {
             }
         });
 
-        let persistance_store = AgentStateRepository::new(&self.config_location);
-        if let State {
-            operation_id: Some(id),
-            operation: Some(operation_string),
-        } = match persistance_store.load().await {
-            Ok(state) => state,
-            Err(_) => State {
-                operation_id: None,
-                operation: None,
-            },
-        } {
-            let operation = SoftwareOperation::from_str(operation_string.as_str())?;
-            let response = SoftwareResponseUpdateStatus {
-                id,
-                status: SoftwareOperationResultStatus::Failed,
-                reason: Some("unfinished operation request".into()),
-                current_software_list: None,
-                failures: None,
-            };
-            let topic = match operation {
-                SoftwareOperation::CurrentSoftwareList => &self.config.response_topic_list,
-
-                SoftwareOperation::SoftwareUpdates => &self.config.response_topic_update,
-
-                SoftwareOperation::UnknownOperation => {
-                    error!("UnknownOperation to in store.");
-                    &self.config.errors_topic
-                }
-            };
-
-            let _ = mqtt
-                .publish(Message::new(topic, response.to_bytes()?))
-                .await?;
-        }
+        let () = self.check_state_store(&mqtt).await?;
 
         // * Maybe it would be nice if mapper/registry responds
         let () = publish_capabilities(&mqtt).await?;
@@ -179,8 +150,17 @@ impl SmAgent {
         let request = match SoftwareRequestUpdate::from_slice(message.payload_trimmed()) {
             Ok(request) => {
                 let () = self
+                    .persistance_store
+                    .store(&State {
+                        operation_id: Some(request.id),
+                        operation: Some("update".into()),
+                    })
+                    .await?;
+
+                let () = self
                     .publish_status_executing(mqtt, response_topic, request.id)
                     .await?;
+
                 request
             }
 
@@ -197,7 +177,7 @@ impl SmAgent {
             }
         };
 
-        let mut response = SoftwareResponseUpdateStatus {
+        let mut response = SoftwareRequestResponse {
             id: request.id,
             status: SoftwareOperationResultStatus::Failed,
             reason: None,
@@ -245,6 +225,8 @@ impl SmAgent {
             .publish(Message::new(response_topic, response.to_bytes()?))
             .await?;
 
+        let _state = self.persistance_store.clear().await?;
+
         Ok(())
     }
 
@@ -252,7 +234,7 @@ impl SmAgent {
         &self,
         software_list_type: SoftwareRequestUpdateList,
         plugin: &ExternalPluginCommand,
-        response: &mut SoftwareResponseUpdateStatus,
+        response: &mut SoftwareRequestResponse,
         failures_modules: &mut Vec<SoftwareListModule>,
     ) -> Result<(), AgentError> {
         for module in software_list_type.list.into_iter() {
@@ -287,9 +269,48 @@ impl SmAgent {
         Ok(())
     }
 
+    async fn check_state_store(&self, mqtt: &Client) -> Result<(), AgentError> {
+        if let State {
+            operation_id: Some(id),
+            operation: Some(operation_string),
+        } = match self.persistance_store.load().await {
+            Ok(state) => state,
+            Err(_) => State {
+                operation_id: None,
+                operation: None,
+            },
+        } {
+            let operation = SoftwareOperation::from_str(operation_string.as_str())?;
+            let topic = match operation {
+                SoftwareOperation::CurrentSoftwareList => &self.config.response_topic_list,
+
+                SoftwareOperation::SoftwareUpdates => &self.config.response_topic_update,
+
+                SoftwareOperation::UnknownOperation => {
+                    error!("UnknownOperation to in store.");
+                    &self.config.errors_topic
+                }
+            };
+
+            let response = SoftwareRequestResponse {
+                id,
+                status: SoftwareOperationResultStatus::Failed,
+                reason: Some("unfinished operation request".into()),
+                current_software_list: None,
+                failures: None,
+            };
+
+            let _ = mqtt
+                .publish(Message::new(topic, response.to_bytes()?))
+                .await?;
+        }
+
+        Ok(())
+    }
+
     fn finalize_response(
         &self,
-        response: &mut SoftwareResponseUpdateStatus,
+        response: &mut SoftwareRequestResponse,
         software_list: &[SoftwareListResponseList],
         failures: &[SoftwareListResponseList],
     ) -> Result<(), AgentError> {
@@ -308,7 +329,7 @@ impl SmAgent {
         response_topic: &Topic,
         id: usize,
     ) -> Result<(), AgentError> {
-        let response = SoftwareResponseUpdateStatus {
+        let response = SoftwareRequestResponse {
             id,
             status: SoftwareOperationResultStatus::Executing,
             current_software_list: None,
@@ -330,10 +351,19 @@ impl SmAgent {
         response_topic: &Topic,
         message: &Message,
     ) -> Result<(), AgentError> {
-        let software_list = tokio::task::spawn_blocking(move || plugins.list()).await??;
-
         let request = match SoftwareRequestList::from_slice(message.payload_trimmed()) {
-            Ok(request) => request,
+            Ok(request) => {
+                let () = self
+                    .persistance_store
+                    .store(&State {
+                        operation_id: Some(request.id),
+                        operation: Some("list".into()),
+                    })
+                    .await?;
+
+                request
+            }
+
             Err(error) => {
                 debug!("Parsing error: {}", error);
                 let _ = mqtt
@@ -347,15 +377,22 @@ impl SmAgent {
             }
         };
 
-        let response = SoftwareListResponse {
+        let current_software_list = tokio::task::spawn_blocking(move || plugins.list()).await??;
+
+        let response = SoftwareRequestResponse {
             id: request.id,
             status: SoftwareOperationResultStatus::Successful,
-            list: software_list,
+            reason: None,
+            current_software_list: Some(current_software_list),
+            failures: None,
         };
 
         let _ = mqtt
             .publish(Message::new(response_topic, response.to_bytes()?))
             .await?;
+
+        let _state = self.persistance_store.clear().await?;
+
         Ok(())
     }
 }
