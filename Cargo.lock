@@ -1514,9 +1514,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.7.2"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
+checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
 
 [[package]]
 name = "oorandom"
@@ -2469,6 +2469,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "tedge_agent"
+version = "0.2.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clock",
+ "env_logger 0.9.0",
+ "flockfile",
+ "futures",
+ "log",
+ "mockall",
+ "mqtt_client",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "structopt",
+ "tedge_config",
+ "tedge_sm_lib",
+ "tedge_users",
+ "tedge_utils",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tedge_apt_plugin"
 version = "0.1.1"
 dependencies = [
@@ -2519,11 +2549,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "tedge_sm_lib"
+version = "0.2.2"
+dependencies = [
+ "anyhow",
+ "env_logger 0.9.0",
+ "log",
+ "mqtt_client",
+ "serde",
+ "serde_json",
+ "structopt",
+ "thiserror",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "tedge_users"
 version = "0.2.3"
 dependencies = [
  "thiserror",
  "users",
+]
+
+[[package]]
+name = "tedge_utils"
+version = "0.2.2"
+dependencies = [
+ "assert_matches",
+ "tempfile",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
