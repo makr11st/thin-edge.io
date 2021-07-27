@@ -177,54 +177,12 @@ impl SmAgent {
             }
         };
 
-        let mut response = SoftwareRequestResponse {
-            id: request.id,
-            status: SoftwareOperationResultStatus::Failed,
-            reason: None,
-            current_software_list: None,
-            failures: None,
-        };
+        let _user_guard = self.user_manager.become_user(ROOT_USER)?;
+        let plugins_2 = plugins.clone();
 
-        let mut failures = ListSoftwareListResponseList::new();
-
-        // TODO: Move logic to tedge_sm and maybe add new module.
-        // * Bear in mind don't use mqtt there
-        let plugins = plugins.clone();
-        for software_list_type in request.update_list {
-            let plugin = plugins
-                .by_software_type(&software_list_type.plugin_type)
-                .unwrap();
-
-            // What to do if prepare fails?
-            // What should be in failures list?
-            if let Err(e) = plugin.prepare() {
-                response.reason = Some(format!("Failed prepare stage: {}", e));
-
-                continue;
-                // let _ = mqtt
-                //     .publish(Message::new(response_topic, response.to_bytes()?))
-                //     .await?;
-            };
-
-            let mut failures_modules = Vec::new();
-
-            let () = self.install_or_remove(
-                software_list_type,
-                plugin,
-                &mut response,
-                &mut failures_modules,
-            )?;
-
-            let () = plugin.finalize()?;
-
-            failures.push(SoftwareListResponseList {
-                plugin_type: plugin.name.clone(),
-                list: failures_modules,
-            });
-        }
-
-        let software_list = tokio::task::spawn_blocking(move || plugins.list()).await??;
-        let () = self.finalize_response(&mut response, &software_list, &failures)?;
+        let mut response = tokio::task::spawn_blocking(move || plugins.process(&request)).await??;
+        let software_list = tokio::task::spawn_blocking(move || plugins_2.list()).await??;
+        let () = response.finalize_response(software_list.to_vec());
 
         let _ = mqtt
             .publish(Message::new(response_topic, response.to_bytes()?))
@@ -232,45 +190,6 @@ impl SmAgent {
 
         let _state = self.persistance_store.clear().await?;
 
-        Ok(())
-    }
-
-    fn install_or_remove(
-        &self,
-        software_list_type: SoftwareRequestUpdateList,
-        plugin: &ExternalPluginCommand,
-        response: &mut SoftwareRequestResponse,
-        failures_modules: &mut Vec<SoftwareListModule>,
-    ) -> Result<(), AgentError> {
-        for module in software_list_type.list.into_iter() {
-            match module.action {
-                SoftwareRequestUpdateAction::Install => {
-                    let _user_guard = self.user_manager.become_user(ROOT_USER)?;
-
-                    if let Err(_err) = plugin.install(&module) {
-                        response.reason = Some("Module installation failed".into());
-                        let () = failures_modules.push(SoftwareListModule {
-                            software_type: module.name.clone(),
-                            name: module.name,
-                            version: module.version,
-                        });
-                    }
-                }
-
-                SoftwareRequestUpdateAction::Remove => {
-                    let _user_guard = self.user_manager.become_user(ROOT_USER)?;
-
-                    if let Err(_err) = plugin.remove(&module) {
-                        response.reason = Some("Module removal failed".into());
-                        let () = failures_modules.push(SoftwareListModule {
-                            software_type: module.name.clone(),
-                            name: module.name,
-                            version: module.version,
-                        });
-                    }
-                }
-            }
-        }
         Ok(())
     }
 
@@ -297,13 +216,9 @@ impl SmAgent {
                 }
             };
 
-            let response = SoftwareRequestResponse {
-                id,
-                status: SoftwareOperationResultStatus::Failed,
-                reason: Some("unfinished operation request".into()),
-                current_software_list: None,
-                failures: None,
-            };
+            let mut response = SoftwareRequestResponse::new(
+                id, SoftwareOperationResultStatus::Failed);
+            response.reason = Some("unfinished operation request".into());
 
             let _ = mqtt
                 .publish(Message::new(topic, response.to_bytes()?))
@@ -313,20 +228,6 @@ impl SmAgent {
         Ok(())
     }
 
-    fn finalize_response(
-        &self,
-        response: &mut SoftwareRequestResponse,
-        software_list: &[SoftwareListResponseList],
-        failures: &[SoftwareListResponseList],
-    ) -> Result<(), AgentError> {
-        if failures.is_empty() {
-            response.status = SoftwareOperationResultStatus::Successful;
-        }
-
-        response.current_software_list = Some(software_list.to_vec());
-        response.failures = Some(failures.to_vec());
-        Ok(())
-    }
 
     async fn publish_status_executing(
         &self,
@@ -334,13 +235,10 @@ impl SmAgent {
         response_topic: &Topic,
         id: usize,
     ) -> Result<(), AgentError> {
-        let response = SoftwareRequestResponse {
+        let response = SoftwareRequestResponse::new(
             id,
-            status: SoftwareOperationResultStatus::Executing,
-            current_software_list: None,
-            reason: None,
-            failures: None,
-        };
+            SoftwareOperationResultStatus::Executing
+        );
 
         let _ = mqtt
             .publish(Message::new(response_topic, response.to_bytes()?))
@@ -384,13 +282,9 @@ impl SmAgent {
 
         let current_software_list = tokio::task::spawn_blocking(move || plugins.list()).await??;
 
-        let response = SoftwareRequestResponse {
-            id: request.id,
-            status: SoftwareOperationResultStatus::Successful,
-            reason: None,
-            current_software_list: Some(current_software_list),
-            failures: None,
-        };
+        let mut response = SoftwareRequestResponse::new(request.id,
+            SoftwareOperationResultStatus::Successful);
+        response.finalize_response(current_software_list);
 
         let _ = mqtt
             .publish(Message::new(response_topic, response.to_bytes()?))
