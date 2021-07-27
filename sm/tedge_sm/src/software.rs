@@ -1,4 +1,4 @@
-use crate::message::SoftwareModulesUpdateRequest;
+use crate::error::SoftwareError;
 use mqtt_client::Topic;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -7,17 +7,32 @@ pub type SoftwareType = String;
 pub type SoftwareName = String;
 pub type SoftwareVersion = String;
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+/// Variants represent Software Operations Supported actions.
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SoftwareModuleAction {
+    Install,
+    Remove,
+}
+
+/// Software module payload definition.
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct SoftwareModule {
-    #[serde(skip)]
-    pub software_type: SoftwareType,
     pub name: SoftwareName,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<SoftwareVersion>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<SoftwareModuleAction>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Variants of supported software operations.
@@ -80,134 +95,9 @@ impl From<String> for SoftwareOperation {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-#[serde(tag = "action")]
-pub enum SoftwareUpdate {
-    #[serde(rename = "install")]
-    Install {
-        #[serde(flatten)]
-        module: SoftwareModule,
-    },
-
-    #[serde(rename = "uninstall")]
-    UnInstall {
-        #[serde(flatten)]
-        module: SoftwareModule,
-    },
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-#[serde(untagged)]
-pub enum SoftwareOperationStatus {
-    SoftwareUpdates { updates: Vec<SoftwareUpdateStatus> },
-    DesiredSoftwareList { updates: Vec<SoftwareUpdateStatus> },
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub struct SoftwareUpdateStatus {
-    pub update: SoftwareUpdate,
-    pub status: UpdateStatus,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum UpdateStatus {
     Scheduled,
     Success,
     Error { reason: SoftwareError },
     Cancelled,
-}
-
-impl SoftwareUpdateStatus {
-    pub fn new(update: &SoftwareUpdate, result: Result<(), SoftwareError>) -> SoftwareUpdateStatus {
-        let status = match result {
-            Ok(()) => UpdateStatus::Success,
-            Err(reason) => UpdateStatus::Error { reason },
-        };
-
-        SoftwareUpdateStatus {
-            update: update.clone(),
-            status,
-        }
-    }
-
-    pub fn scheduled(update: &SoftwareUpdate) -> SoftwareUpdateStatus {
-        SoftwareUpdateStatus {
-            update: update.clone(),
-            status: UpdateStatus::Scheduled,
-        }
-    }
-
-    pub fn cancelled(update: &SoftwareUpdate) -> SoftwareUpdateStatus {
-        SoftwareUpdateStatus {
-            update: update.clone(),
-            status: UpdateStatus::Cancelled,
-        }
-    }
-}
-
-#[derive(thiserror::Error, Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub enum SoftwareError {
-    #[error("Failed to finalize")]
-    Finalize { reason: String },
-
-    #[error("Failed to install {module:?}")]
-    Install {
-        module: SoftwareModulesUpdateRequest,
-        reason: String,
-    },
-
-    #[error("JSON parse error: {reason:?}")]
-    ParseError { reason: String },
-
-    #[error("Plugin error for {software_type:?}, reason: {reason:?}")]
-    Plugin {
-        software_type: SoftwareType,
-        reason: String,
-    },
-
-    #[error("Failed to prepare")]
-    Prepare { reason: String },
-
-    #[error("Failed to uninstall {module:?}")]
-    Uninstall {
-        module: SoftwareModulesUpdateRequest,
-        reason: String,
-    },
-
-    #[error("Unknown {software_type:?} module: {name:?}")]
-    UnknownModule {
-        software_type: SoftwareType,
-        name: SoftwareName,
-    },
-
-    #[error("Unknown software type: {software_type:?}")]
-    UnknownSoftwareType { software_type: SoftwareType },
-
-    #[error("Unknown {software_type:?} version: {name:?} - {version:?}")]
-    UnknownVersion {
-        software_type: SoftwareType,
-        name: SoftwareName,
-        version: SoftwareVersion,
-    },
-
-    #[error("Unexpected module type: actual: {actual_type:?}, expected: {expected_type:?}")]
-    WrongModuleType {
-        actual_type: SoftwareType,
-        expected_type: SoftwareType,
-    },
-}
-
-impl From<serde_json::Error> for SoftwareError {
-    fn from(err: serde_json::Error) -> Self {
-        SoftwareError::ParseError {
-            reason: format!("{}", err),
-        }
-    }
-}
-
-impl SoftwareUpdate {
-    pub fn module(&self) -> &SoftwareModule {
-        match self {
-            SoftwareUpdate::Install { module } | SoftwareUpdate::UnInstall { module } => module,
-        }
-    }
 }

@@ -1,14 +1,12 @@
 use crate::{
+    error::SoftwareError,
     message::{
-        self, SoftwareListModule, SoftwareListResponseList,
-        SoftwareModulesUpdateRequest, SoftwareOperationResultStatus, SoftwareRequestResponse,
-        SoftwareRequestUpdateAction, SoftwareRequestUpdateList,
+        self, SoftwareOperationStatus, SoftwareRequestResponse, SoftwareRequestResponseSoftwareList,
     },
     plugin::*,
-    software::*,
+    software::{SoftwareModule, SoftwareModuleAction},
 };
 use std::{collections::HashMap, fs, io, path::PathBuf};
-use tedge_users::{UserManager, ROOT_USER};
 
 /// The main responsibility of a `Plugins` implementation is to retrieve the appropriate plugin for a given software module.
 pub trait Plugins {
@@ -96,7 +94,7 @@ impl ExternalPlugins {
         self.plugin_map.is_empty()
     }
 
-    pub fn list(&self) -> Result<Vec<SoftwareListResponseList>, SoftwareError> {
+    pub fn list(&self) -> Result<Vec<SoftwareRequestResponseSoftwareList>, SoftwareError> {
         let mut complete_software_list = Vec::new();
         for software_type in self.plugin_map.keys() {
             let plugin_software_list = self.plugin(&software_type)?.list()?;
@@ -111,7 +109,7 @@ impl ExternalPlugins {
     ) -> Result<SoftwareRequestResponse, SoftwareError> {
         let mut response = SoftwareRequestResponse {
             id: request.id,
-            status: SoftwareOperationResultStatus::Failed,
+            status: SoftwareOperationStatus::Failed,
             reason: None,
             current_software_list: Vec::new(),
             failures: Vec::new(),
@@ -135,7 +133,7 @@ impl ExternalPlugins {
             // What to do if finalize fails?
             let () = plugin.finalize()?;
 
-            response.failures.push(SoftwareRequestUpdateList {
+            response.failures.push(SoftwareRequestResponseSoftwareList {
                 plugin_type: plugin.name.clone(),
                 list: failed_actions,
             });
@@ -146,18 +144,19 @@ impl ExternalPlugins {
 
     fn install_or_remove(
         &self,
-        actions: &Vec<SoftwareModulesUpdateRequest>,
+        actions: &[SoftwareModule],
         plugin: &ExternalPluginCommand,
-    ) -> Vec<SoftwareModulesUpdateRequest> {
+    ) -> Vec<SoftwareModule> {
         let mut failed_actions = Vec::new();
 
-        for module in actions.into_iter() {
+        for module in actions.iter() {
             let status = match module.action {
-                SoftwareRequestUpdateAction::Install => plugin.install(&module),
-                SoftwareRequestUpdateAction::Remove => plugin.remove(&module),
+                Some(SoftwareModuleAction::Install) => plugin.install(&module),
+                Some(SoftwareModuleAction::Remove) => plugin.remove(&module),
+                None => continue,
             };
 
-            if let Err(_) = status {
+            if status.is_err() {
                 let mut error = module.clone();
                 error.reason = Some("Action failed".into());
                 let () = failed_actions.push(error);

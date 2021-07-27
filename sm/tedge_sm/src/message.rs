@@ -1,159 +1,65 @@
-use crate::software::*;
+use crate::{
+    error::SoftwareError,
+    software::{SoftwareModule, SoftwareType},
+};
 use serde::{Deserialize, Serialize};
 
-// trait Jsonify {
-//     fn from_json(json_str: &str) -> Result<Self, SoftwareError> {
-//         Ok(serde_json::from_str(json_str)?)
-//     }
+pub trait Jsonify<'a>
+where
+    Self: Deserialize<'a> + Serialize + Sized,
+{
+    fn from_json(json_str: &'a str) -> Result<Self, SoftwareError> {
+        Ok(serde_json::from_str(json_str)?)
+    }
 
-//     fn from_slice(bytes: &[u8]) -> Result<Self, SoftwareError> {
-//         Ok(serde_json::from_slice(bytes)?)
-//     }
+    fn from_slice(bytes: &'a [u8]) -> Result<Self, SoftwareError> {
+        Ok(serde_json::from_slice(bytes)?)
+    }
 
-//     fn to_json(&self) -> Result<String, SoftwareError> {
-//         Ok(serde_json::to_string(self)?)
-//     }
-// }
+    fn to_json(&self) -> Result<String, SoftwareError> {
+        Ok(serde_json::to_string(self)?)
+    }
+
+    fn to_bytes(&self) -> Result<Vec<u8>, SoftwareError> {
+        Ok(serde_json::to_vec(self)?)
+    }
+}
 
 /// Message payload definition for SoftwareList request.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct SoftwareRequestList {
     pub id: usize,
 }
 
-impl SoftwareRequestList {
-    pub fn from_json(json_str: &str) -> Result<Self, SoftwareError> {
-        Ok(serde_json::from_str(json_str)?)
-    }
-
-    pub fn from_slice(bytes: &[u8]) -> Result<Self, SoftwareError> {
-        Ok(serde_json::from_slice(bytes)?)
-    }
-
-    pub fn to_json(&self) -> Result<String, SoftwareError> {
-        Ok(serde_json::to_string(self)?)
-    }
-}
+impl<'a> Jsonify<'a> for SoftwareRequestList {}
 
 /// Message payload definition for SoftwareUpdate request.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SoftwareRequestUpdate {
     pub id: usize,
-    pub update_list: Vec<SoftwareRequestUpdateList>,
+    pub update_list: Vec<SoftwareRequestResponseSoftwareList>,
 }
 
-impl SoftwareRequestUpdate {
-    pub fn from_json(json_str: &str) -> Result<Self, SoftwareError> {
-        Ok(serde_json::from_str(json_str)?)
-    }
-
-    pub fn from_slice(bytes: &[u8]) -> Result<Self, SoftwareError> {
-        Ok(serde_json::from_slice(bytes)?)
-    }
-
-    pub fn to_json(&self) -> Result<String, SoftwareError> {
-        Ok(serde_json::to_string(self)?)
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
-pub struct SoftwareRequestUpdateList {
-    #[serde(rename = "type")]
-    pub plugin_type: SoftwareType,
-    pub list: Vec<SoftwareModulesUpdateRequest>,
-}
-
-/// Software module payload definition.
-#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
-pub struct SoftwareModulesUpdateRequest {
-    pub name: SoftwareName,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub version: Option<SoftwareVersion>,
-
-    pub action: SoftwareRequestUpdateAction,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
-}
+impl<'a> Jsonify<'a> for SoftwareRequestUpdate {}
 
 /// Sub list of modules grouped by plugin type.
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
-pub struct SoftwareListResponseList {
+pub struct SoftwareRequestResponseSoftwareList {
     #[serde(rename = "type")]
     pub plugin_type: SoftwareType,
-    pub list: Vec<SoftwareListModule>,
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-// #[serde(deny_unknown_fields)]
-pub struct SoftwareListModule {
-    #[serde(skip)]
-    pub software_type: SoftwareType,
-    pub name: SoftwareName,
-    pub version: Option<SoftwareVersion>,
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
-pub struct SoftwareRequestUpdateStatus {
-    pub update: SoftwareModulesUpdateRequest,
-    pub status: UpdateStatus,
-}
-
-impl SoftwareRequestUpdateStatus {
-    pub fn new(update: &SoftwareModulesUpdateRequest, result: Result<(), SoftwareError>) -> Self {
-        let status = match result {
-            Ok(()) => UpdateStatus::Success,
-            Err(reason) => UpdateStatus::Error { reason },
-        };
-
-        Self {
-            update: update.clone(),
-            status,
-        }
-    }
-
-    pub fn scheduled(update: &SoftwareModulesUpdateRequest) -> Self {
-        Self {
-            update: update.clone(),
-            status: UpdateStatus::Scheduled,
-        }
-    }
-
-    pub fn cancelled(update: &SoftwareModulesUpdateRequest) -> Self {
-        Self {
-            update: update.clone(),
-            status: UpdateStatus::Cancelled,
-        }
-    }
-}
-
-/// Variants represent Software Operations Supported actions.
-#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum SoftwareRequestUpdateAction {
-    Install,
-    Remove,
+    pub list: Vec<SoftwareModule>,
 }
 
 /// Possible statuses for result of Software operation.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub enum SoftwareOperationResultStatus {
+pub enum SoftwareOperationStatus {
     Successful,
     Failed,
     Executing,
@@ -165,33 +71,23 @@ pub enum SoftwareOperationResultStatus {
 pub struct SoftwareRequestResponse {
     // TODO: Is this the right approach, maybe nanoid?
     pub id: usize,
-    pub status: SoftwareOperationResultStatus,
+    pub status: SoftwareOperationStatus,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub current_software_list: Vec<SoftwareListResponseList>,
+    pub current_software_list: Vec<SoftwareRequestResponseSoftwareList>,
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub failures: Vec<SoftwareRequestUpdateList>,
+    pub failures: Vec<SoftwareRequestResponseSoftwareList>,
 }
 
-// TODO: Add methods to to handle response changes, eg add_failure, update reason ...
+impl<'a> Jsonify<'a> for SoftwareRequestResponse {}
+
+// TODO: Add methods to handle response changes, eg add_failure, update reason ...
 impl SoftwareRequestResponse {
-    pub fn from_json(json_str: &str) -> Result<Self, SoftwareError> {
-        Ok(serde_json::from_str(json_str)?)
-    }
-
-    pub fn to_json(&self) -> Result<String, SoftwareError> {
-        Ok(serde_json::to_string(self)?)
-    }
-
-    pub fn to_bytes(&self) -> Result<Vec<u8>, SoftwareError> {
-        Ok(serde_json::to_vec(self)?)
-    }
-
-    pub fn new(id: usize, status: SoftwareOperationResultStatus) -> SoftwareRequestResponse {
+    pub fn new(id: usize, status: SoftwareOperationStatus) -> Self {
         SoftwareRequestResponse {
             id,
             status,
@@ -201,21 +97,20 @@ impl SoftwareRequestResponse {
         }
     }
 
-    pub fn finalize_response(
-        &mut self,
-        software_list: Vec<SoftwareListResponseList>,
-    ) {
+    pub fn finalize_response(&mut self, software_list: Vec<SoftwareRequestResponseSoftwareList>) {
         if self.failures.is_empty() {
-            self.status = SoftwareOperationResultStatus::Successful;
+            self.status = SoftwareOperationStatus::Successful;
         }
 
         self.current_software_list = software_list;
     }
-
 }
 
 #[cfg(test)]
 mod tests {
+
+    use crate::software::SoftwareModuleAction;
+
     use super::*;
 
     #[test]
@@ -234,36 +129,36 @@ mod tests {
 
     #[test]
     fn serde_software_request_update() {
-        let debian_module1 = SoftwareModulesUpdateRequest {
+        let debian_module1 = SoftwareModule {
             name: "debian1".into(),
             version: Some("0.0.1".into()),
-            action: SoftwareRequestUpdateAction::Install,
+            action: Some(SoftwareModuleAction::Install),
             url: None,
             reason: None,
         };
 
-        let debian_module2 = SoftwareModulesUpdateRequest {
+        let debian_module2 = SoftwareModule {
             name: "debian2".into(),
             version: Some("0.0.2".into()),
-            action: SoftwareRequestUpdateAction::Install,
+            action: Some(SoftwareModuleAction::Install),
             url: None,
             reason: None,
         };
 
-        let debian_list = SoftwareRequestUpdateList {
+        let debian_list = SoftwareRequestResponseSoftwareList {
             plugin_type: "debian".into(),
             list: vec![debian_module1, debian_module2],
         };
 
-        let docker_module1 = SoftwareModulesUpdateRequest {
+        let docker_module1 = SoftwareModule {
             name: "docker1".into(),
             version: Some("0.0.1".into()),
-            action: SoftwareRequestUpdateAction::Remove,
+            action: Some(SoftwareModuleAction::Remove),
             url: Some("test.com".into()),
             reason: None,
         };
 
-        let docker_list = SoftwareRequestUpdateList {
+        let docker_list = SoftwareRequestResponseSoftwareList {
             plugin_type: "docker".into(),
             list: vec![docker_module1],
         };
@@ -283,35 +178,35 @@ mod tests {
         assert_eq!(parsed_request, request);
     }
 
-    #[test]
-    fn serialize_and_parse_update_status() {
-        let status = SoftwareUpdateStatus {
-            update: SoftwareUpdate::Install {
-                module: SoftwareModule {
-                    software_type: "".into(),
-                    name: "test_core".into(),
-                    version: None,
-                    url: None,
-                },
-            },
-            status: UpdateStatus::Success,
-        };
+    // #[test]
+    // fn serialize_and_parse_update_status() {
+    //     let status = SoftwareUpdateStatus {
+    //         update: SoftwareUpdate::Install {
+    //             module: SoftwareModule {
+    //                 software_type: "".into(),
+    //                 name: "test_core".into(),
+    //                 version: None,
+    //                 url: None,
+    //             },
+    //         },
+    //         status: UpdateStatus::Success,
+    //     };
 
-        let expected_json =
-            r#"{"update":{"action":"install","name":"test_core"},"status":"Success"}"#;
-        let actual_json = serde_json::to_string(&status).expect("Fail to serialize a status");
-        assert_eq!(actual_json, expected_json);
+    //     let expected_json =
+    //         r#"{"update":{"action":"install","name":"test_core"},"status":"Success"}"#;
+    //     let actual_json = serde_json::to_string(&status).expect("Fail to serialize a status");
+    //     assert_eq!(actual_json, expected_json);
 
-        let parsed_status: SoftwareUpdateStatus =
-            serde_json::from_str(&actual_json).expect("Fail to parse the json status");
-        assert_eq!(parsed_status, status);
-    }
+    //     let parsed_status: SoftwareUpdateStatus =
+    //         serde_json::from_str(&actual_json).expect("Fail to parse the json status");
+    //     assert_eq!(parsed_status, status);
+    // }
 
     #[test]
     fn serde_software_list_empty_successful() {
         let request = SoftwareRequestResponse {
             id: 1234,
-            status: SoftwareOperationResultStatus::Successful,
+            status: SoftwareOperationStatus::Successful,
             reason: None,
             current_software_list: vec![],
             failures: vec![],
@@ -329,29 +224,28 @@ mod tests {
 
     #[test]
     fn serde_software_list_some_modules_successful() {
-        let module1 = SoftwareListModule {
-            software_type: "".into(),
+        let module1 = SoftwareModule {
             name: "debian1".into(),
             version: Some("0.0.1".into()),
+            action: None,
+            url: None,
+            reason: None,
         };
 
-        let docker_module1 = SoftwareListResponseList {
+        let docker_module1 = SoftwareRequestResponseSoftwareList {
             plugin_type: "debian".into(),
             list: vec![module1],
         };
 
         let request = SoftwareRequestResponse {
             id: 1234,
-            status: SoftwareOperationResultStatus::Successful,
+            status: SoftwareOperationStatus::Successful,
             reason: None,
             current_software_list: vec![docker_module1],
             failures: vec![],
         };
 
-        let expected_json = r#"{"id":1234,"status":"successful","currentSof
-
-
-        twareList":[{"type":"debian","list":[{"name":"debian1","version":"0.0.1"}]}]}"#;
+        let expected_json = r#"{"id":1234,"status":"successful","currentSoftwareList":[{"type":"debian","list":[{"name":"debian1","version":"0.0.1"}]}]}"#;
 
         let actual_json = request.to_json().expect("Fail to serialize the request");
         assert_eq!(actual_json, expected_json);

@@ -6,7 +6,7 @@ use log::{debug, error, info};
 use mqtt_client::{Client, Message, MqttClient, Topic, TopicFilter};
 use std::{str::FromStr, sync::Arc};
 use tedge_config::TEdgeConfigLocation;
-use tedge_sm_lib::{message::*, plugin::*, plugin_manager::*, software::*};
+use tedge_sm_lib::{error::SoftwareError, message::*, plugin_manager::*, software::*};
 use tedge_users::{UserManager, ROOT_USER};
 
 #[derive(Debug)]
@@ -178,10 +178,14 @@ impl SmAgent {
         };
 
         let _user_guard = self.user_manager.become_user(ROOT_USER)?;
-        let plugins_2 = plugins.clone();
 
-        let mut response = tokio::task::spawn_blocking(move || plugins.process(&request)).await??;
-        let software_list = tokio::task::spawn_blocking(move || plugins_2.list()).await??;
+        let process_plugins = plugins.clone();
+        let mut response =
+            tokio::task::spawn_blocking(move || process_plugins.process(&request)).await??;
+
+        let list_plugins = plugins.clone();
+        let software_list = tokio::task::spawn_blocking(move || list_plugins.list()).await??;
+
         let () = response.finalize_response(software_list.to_vec());
 
         let _ = mqtt
@@ -216,8 +220,7 @@ impl SmAgent {
                 }
             };
 
-            let mut response = SoftwareRequestResponse::new(
-                id, SoftwareOperationResultStatus::Failed);
+            let mut response = SoftwareRequestResponse::new(id, SoftwareOperationStatus::Failed);
             response.reason = Some("unfinished operation request".into());
 
             let _ = mqtt
@@ -228,17 +231,13 @@ impl SmAgent {
         Ok(())
     }
 
-
     async fn publish_status_executing(
         &self,
         mqtt: &Client,
         response_topic: &Topic,
         id: usize,
     ) -> Result<(), AgentError> {
-        let response = SoftwareRequestResponse::new(
-            id,
-            SoftwareOperationResultStatus::Executing
-        );
+        let response = SoftwareRequestResponse::new(id, SoftwareOperationStatus::Executing);
 
         let _ = mqtt
             .publish(Message::new(response_topic, response.to_bytes()?))
@@ -282,8 +281,8 @@ impl SmAgent {
 
         let current_software_list = tokio::task::spawn_blocking(move || plugins.list()).await??;
 
-        let mut response = SoftwareRequestResponse::new(request.id,
-            SoftwareOperationResultStatus::Successful);
+        let mut response =
+            SoftwareRequestResponse::new(request.id, SoftwareOperationStatus::Successful);
         response.finalize_response(current_software_list);
 
         let _ = mqtt

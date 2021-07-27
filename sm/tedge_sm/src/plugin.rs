@@ -1,9 +1,7 @@
 use crate::{
-    message::{
-        SoftwareListModule, SoftwareListResponseList, SoftwareModulesUpdateRequest,
-        SoftwareRequestUpdateAction, SoftwareRequestUpdateStatus,
-    },
-    software::*,
+    error::SoftwareError,
+    message::SoftwareRequestResponseSoftwareList,
+    software::{SoftwareModule, SoftwareType},
 };
 use std::{
     iter::Iterator,
@@ -13,23 +11,20 @@ use std::{
 
 pub trait Plugin {
     fn prepare(&self) -> Result<(), SoftwareError>;
-    fn install(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError>;
-    fn remove(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError>;
+    fn install(&self, module: &SoftwareModule) -> Result<(), SoftwareError>;
+    fn remove(&self, module: &SoftwareModule) -> Result<(), SoftwareError>;
     fn finalize(&self) -> Result<(), SoftwareError>;
-    fn list(&self) -> Result<SoftwareListResponseList, SoftwareError>;
-    fn version(
-        &self,
-        module: &SoftwareModulesUpdateRequest,
-    ) -> Result<Option<String>, SoftwareError>;
+    fn list(&self) -> Result<SoftwareRequestResponseSoftwareList, SoftwareError>;
+    fn version(&self, module: &SoftwareModule) -> Result<Option<String>, SoftwareError>;
 
-    fn apply(&self, update: &SoftwareModulesUpdateRequest) -> SoftwareRequestUpdateStatus {
-        let result = match update.action {
-            SoftwareRequestUpdateAction::Install => self.install(&update),
-            SoftwareRequestUpdateAction::Remove => self.remove(&update),
-        };
+    // fn apply(&self, update: &SoftwareModulesUpdateRequest) -> SoftwareRequestUpdateStatus {
+    //     let result = match update.action {
+    //         SoftwareRequestUpdateAction::Install => self.install(&update),
+    //         SoftwareRequestUpdateAction::Remove => self.remove(&update),
+    //     };
 
-        SoftwareRequestUpdateStatus::new(update, result)
-    }
+    //     SoftwareRequestUpdateStatus::new(update, result)
+    // }
 }
 
 #[derive(Debug)]
@@ -49,7 +44,7 @@ impl ExternalPluginCommand {
     pub fn command(
         &self,
         action: &str,
-        maybe_module: Option<&SoftwareModulesUpdateRequest>,
+        maybe_module: Option<&SoftwareModule>,
     ) -> Result<Command, SoftwareError> {
         let mut command = Command::new(&self.path);
         command.arg(action);
@@ -109,7 +104,7 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn install(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError> {
+    fn install(&self, module: &SoftwareModule) -> Result<(), SoftwareError> {
         let command = self.command(INSTALL, Some(module))?;
         let output = self.execute(command)?;
 
@@ -123,7 +118,7 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn remove(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError> {
+    fn remove(&self, module: &SoftwareModule) -> Result<(), SoftwareError> {
         let command = self.command(UNINSTALL, Some(module))?;
         let output = self.execute(command)?;
 
@@ -150,7 +145,7 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn list(&self) -> Result<SoftwareListResponseList, SoftwareError> {
+    fn list(&self) -> Result<SoftwareRequestResponseSoftwareList, SoftwareError> {
         let command = self.command(LIST, None)?;
         let output = self.execute(command)?;
         let mut software_list = Vec::new();
@@ -162,12 +157,12 @@ impl Plugin for ExternalPluginCommand {
             .for_each(|split: &[u8]| {
                 let software_json_line = std::str::from_utf8(split).unwrap();
                 let software_module =
-                    serde_json::from_str::<SoftwareListModule>(software_json_line).unwrap();
+                    serde_json::from_str::<SoftwareModule>(software_json_line).unwrap();
                 software_list.push(software_module);
             });
 
         if output.status.success() {
-            let list_software_list = SoftwareListResponseList {
+            let list_software_list = SoftwareRequestResponseSoftwareList {
                 plugin_type: self.name.clone(),
                 list: software_list,
             };
@@ -181,10 +176,7 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn version(
-        &self,
-        module: &SoftwareModulesUpdateRequest,
-    ) -> Result<Option<String>, SoftwareError> {
+    fn version(&self, module: &SoftwareModule) -> Result<Option<String>, SoftwareError> {
         let command = self.command(VERSION, Some(module))?;
         let output = self.execute(command)?;
 

@@ -1,6 +1,5 @@
 use mqtt_client::MqttClientError;
-use tedge_config::TEdgeConfigError;
-use tedge_sm_lib::software::SoftwareError;
+use tedge_sm_lib::error::SoftwareError;
 use tedge_users::UserSwitchError;
 
 #[derive(Debug, thiserror::Error)]
