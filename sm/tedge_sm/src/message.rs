@@ -170,12 +170,11 @@ pub struct SoftwareRequestResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub current_software_list: Option<ListSoftwareListResponseList>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub current_software_list: Vec<SoftwareListResponseList>,
 
-    // TODO: Make it vec and use is_empty instead of Option
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub failures: Option<ListSoftwareListResponseList>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<SoftwareRequestUpdateList>,
 }
 
 // TODO: Add methods to to handle response changes, eg add_failure, update reason ...
@@ -191,10 +190,29 @@ impl SoftwareRequestResponse {
     pub fn to_bytes(&self) -> Result<Vec<u8>, SoftwareError> {
         Ok(serde_json::to_vec(self)?)
     }
-}
 
-/// List of Software
-pub type ListSoftwareListResponseList = Vec<SoftwareListResponseList>;
+    pub fn new(id: usize, status: SoftwareOperationResultStatus) -> SoftwareRequestResponse {
+        SoftwareRequestResponse {
+            id,
+            status,
+            current_software_list: vec![],
+            reason: None,
+            failures: vec![],
+        }
+    }
+
+    pub fn finalize_response(
+        &mut self,
+        software_list: Vec<SoftwareListResponseList>,
+    ) {
+        if self.failures.is_empty() {
+            self.status = SoftwareOperationResultStatus::Successful;
+        }
+
+        self.current_software_list = software_list;
+    }
+
+}
 
 #[cfg(test)]
 mod tests {
@@ -221,6 +239,7 @@ mod tests {
             version: Some("0.0.1".into()),
             action: SoftwareRequestUpdateAction::Install,
             url: None,
+            reason: None,
         };
 
         let debian_module2 = SoftwareModulesUpdateRequest {
@@ -228,6 +247,7 @@ mod tests {
             version: Some("0.0.2".into()),
             action: SoftwareRequestUpdateAction::Install,
             url: None,
+            reason: None,
         };
 
         let debian_list = SoftwareRequestUpdateList {
@@ -240,6 +260,7 @@ mod tests {
             version: Some("0.0.1".into()),
             action: SoftwareRequestUpdateAction::Remove,
             url: Some("test.com".into()),
+            reason: None,
         };
 
         let docker_list = SoftwareRequestUpdateList {
@@ -292,8 +313,8 @@ mod tests {
             id: 1234,
             status: SoftwareOperationResultStatus::Successful,
             reason: None,
-            current_software_list: Some(vec![]),
-            failures: None,
+            current_software_list: vec![],
+            failures: vec![],
         };
 
         let expected_json = r#"{"id":1234,"status":"successful","currentSoftwareList":[]}"#;
@@ -323,11 +344,14 @@ mod tests {
             id: 1234,
             status: SoftwareOperationResultStatus::Successful,
             reason: None,
-            current_software_list: Some(vec![docker_module1]),
-            failures: None,
+            current_software_list: vec![docker_module1],
+            failures: vec![],
         };
 
-        let expected_json = r#"{"id":1234,"status":"successful","currentSoftwareList":[{"type":"debian","list":[{"name":"debian1","version":"0.0.1"}]}]}"#;
+        let expected_json = r#"{"id":1234,"status":"successful","currentSof
+
+
+        twareList":[{"type":"debian","list":[{"name":"debian1","version":"0.0.1"}]}]}"#;
 
         let actual_json = request.to_json().expect("Fail to serialize the request");
         assert_eq!(actual_json, expected_json);
