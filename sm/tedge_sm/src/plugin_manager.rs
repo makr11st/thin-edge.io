@@ -1,5 +1,14 @@
-use crate::{message::ListSoftwareListResponseList, plugin::*, software::*};
+use crate::{
+    message::{
+        self, ListSoftwareListResponseList, SoftwareListModule, SoftwareListResponseList,
+        SoftwareModulesUpdateRequest, SoftwareOperationResultStatus, SoftwareRequestResponse,
+        SoftwareRequestUpdateAction, SoftwareRequestUpdateList,
+    },
+    plugin::*,
+    software::*,
+};
 use std::{collections::HashMap, fs, io, path::PathBuf};
+use tedge_users::{UserManager, ROOT_USER};
 
 /// The main responsibility of a `Plugins` implementation is to retrieve the appropriate plugin for a given software module.
 pub trait Plugins {
@@ -25,6 +34,7 @@ pub trait Plugins {
     }
 }
 
+// type PluginName = String;
 #[derive(Debug)]
 pub struct ExternalPlugins {
     plugin_dir: PathBuf,
@@ -93,5 +103,65 @@ impl ExternalPlugins {
             complete_software_list.push(plugin_software_list);
         }
         Ok(complete_software_list)
+    }
+
+    pub fn process(
+        &self,
+        request: &message::SoftwareRequestUpdate,
+    ) -> Result<SoftwareRequestResponse, SoftwareError> {
+        // TODO move this in the aglet _user_guard = self.user_manager.become_user(ROOT_USER)?;
+
+        let mut response = SoftwareRequestResponse {
+            id: request.id,
+            status: SoftwareOperationResultStatus::Failed,
+            reason: None,
+            current_software_list: None,
+            failures: None,
+        };
+
+        let mut failures = Vec::new();
+
+        for software_list_type in request.update_list {
+            let plugin = self
+                .by_software_type(&software_list_type.plugin_type)
+                .unwrap();
+
+            // What to do if prepare fails?
+            // What should be in failures list?
+            if let Err(e) = plugin.prepare() {
+                response.reason = Some(format!("Failed prepare stage: {}", e));
+
+                continue;
+            };
+
+            let failures_modules = self.install_or_remove(&software_list_type.list, plugin);
+
+            let () = plugin.finalize()?;
+
+            failures.push(failures_modules);
+        }
+
+        Ok(response)
+    }
+
+    fn install_or_remove(
+        &self,
+        software_list_type: &Vec<SoftwareModulesUpdateRequest>,
+        plugin: &ExternalPluginCommand,
+    ) -> SoftwareListResponseList {
+        let mut failures_modules = Vec::new();
+
+        for module in software_list_type.into_iter() {
+            let status = match module.action {
+                SoftwareRequestUpdateAction::Install => plugin.install(&module),
+                SoftwareRequestUpdateAction::Remove => plugin.remove(&module),
+            };
+
+            if let Err(_) = status {
+                let mut error = module.clone();
+                error.reason = Some("Action failed".into());
+                let () = failures_modules.push(error);
+            };
+        }
     }
 }

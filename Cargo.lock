@@ -2559,6 +2559,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
+ "tedge_users",
  "thiserror",
  "tokio",
  "url",

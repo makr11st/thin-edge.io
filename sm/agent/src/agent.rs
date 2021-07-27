@@ -137,7 +137,7 @@ impl SmAgent {
     }
 
     fn handle_unknown_operation(&self) {
-        todo!()
+        log_error();
     }
 
     async fn handle_software_update_request(
@@ -187,18 +187,23 @@ impl SmAgent {
 
         let mut failures = ListSoftwareListResponseList::new();
 
+        // TODO: Move logic to tedge_sm and maybe add new module.
+        // * Bear in mind don't use mqtt there
         let plugins = plugins.clone();
         for software_list_type in request.update_list {
             let plugin = plugins
                 .by_software_type(&software_list_type.plugin_type)
                 .unwrap();
 
+            // What to do if prepare fails?
+            // What should be in failures list?
             if let Err(e) = plugin.prepare() {
                 response.reason = Some(format!("Failed prepare stage: {}", e));
 
-                let _ = mqtt
-                    .publish(Message::new(response_topic, response.to_bytes()?))
-                    .await?;
+                continue;
+                // let _ = mqtt
+                //     .publish(Message::new(response_topic, response.to_bytes()?))
+                //     .await?;
             };
 
             let mut failures_modules = Vec::new();
@@ -395,6 +400,10 @@ impl SmAgent {
 
         Ok(())
     }
+}
+
+fn log_error() {
+    error!("error handler");
 }
 
 async fn publish_capabilities(mqtt: &Client) -> Result<(), AgentError> {

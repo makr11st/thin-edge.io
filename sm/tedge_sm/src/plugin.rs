@@ -1,7 +1,7 @@
 use crate::{
     message::{
-        SoftwareListModule, SoftwareListResponseList, SoftwareRequestUpdateAction,
-        SoftwareRequestUpdateModule, SoftwareRequestUpdateStatus,
+        SoftwareListModule, SoftwareListResponseList, SoftwareModulesUpdateRequest,
+        SoftwareRequestUpdateAction, SoftwareRequestUpdateStatus,
     },
     software::*,
 };
@@ -13,16 +13,16 @@ use std::{
 
 pub trait Plugin {
     fn prepare(&self) -> Result<(), SoftwareError>;
-    fn install(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError>;
-    fn remove(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError>;
+    fn install(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError>;
+    fn remove(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError>;
     fn finalize(&self) -> Result<(), SoftwareError>;
     fn list(&self) -> Result<SoftwareListResponseList, SoftwareError>;
     fn version(
         &self,
-        module: &SoftwareRequestUpdateModule,
+        module: &SoftwareModulesUpdateRequest,
     ) -> Result<Option<String>, SoftwareError>;
 
-    fn apply(&self, update: &SoftwareRequestUpdateModule) -> SoftwareRequestUpdateStatus {
+    fn apply(&self, update: &SoftwareModulesUpdateRequest) -> SoftwareRequestUpdateStatus {
         let result = match update.action {
             SoftwareRequestUpdateAction::Install => self.install(&update),
             SoftwareRequestUpdateAction::Remove => self.remove(&update),
@@ -49,7 +49,7 @@ impl ExternalPluginCommand {
     pub fn command(
         &self,
         action: &str,
-        maybe_module: Option<&SoftwareRequestUpdateModule>,
+        maybe_module: Option<&SoftwareModulesUpdateRequest>,
     ) -> Result<Command, SoftwareError> {
         let mut command = Command::new(&self.path);
         command.arg(action);
@@ -109,7 +109,7 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn install(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError> {
+    fn install(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError> {
         let command = self.command(INSTALL, Some(module))?;
         let output = self.execute(command)?;
 
@@ -123,7 +123,7 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn remove(&self, module: &SoftwareRequestUpdateModule) -> Result<(), SoftwareError> {
+    fn remove(&self, module: &SoftwareModulesUpdateRequest) -> Result<(), SoftwareError> {
         let command = self.command(UNINSTALL, Some(module))?;
         let output = self.execute(command)?;
 
@@ -183,7 +183,7 @@ impl Plugin for ExternalPluginCommand {
 
     fn version(
         &self,
-        module: &SoftwareRequestUpdateModule,
+        module: &SoftwareModulesUpdateRequest,
     ) -> Result<Option<String>, SoftwareError> {
         let command = self.command(VERSION, Some(module))?;
         let output = self.execute(command)?;

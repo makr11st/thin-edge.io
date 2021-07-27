@@ -64,14 +64,14 @@ impl SoftwareRequestUpdate {
 pub struct SoftwareRequestUpdateList {
     #[serde(rename = "type")]
     pub plugin_type: SoftwareType,
-    pub list: Vec<SoftwareRequestUpdateModule>,
+    pub list: Vec<SoftwareModulesUpdateRequest>,
 }
 
 /// Software module payload definition.
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
-pub struct SoftwareRequestUpdateModule {
+pub struct SoftwareModulesUpdateRequest {
     pub name: SoftwareName,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,6 +81,9 @@ pub struct SoftwareRequestUpdateModule {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Sub list of modules grouped by plugin type.
@@ -107,12 +110,12 @@ pub struct SoftwareListModule {
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct SoftwareRequestUpdateStatus {
-    pub update: SoftwareRequestUpdateModule,
+    pub update: SoftwareModulesUpdateRequest,
     pub status: UpdateStatus,
 }
 
 impl SoftwareRequestUpdateStatus {
-    pub fn new(update: &SoftwareRequestUpdateModule, result: Result<(), SoftwareError>) -> Self {
+    pub fn new(update: &SoftwareModulesUpdateRequest, result: Result<(), SoftwareError>) -> Self {
         let status = match result {
             Ok(()) => UpdateStatus::Success,
             Err(reason) => UpdateStatus::Error { reason },
@@ -124,14 +127,14 @@ impl SoftwareRequestUpdateStatus {
         }
     }
 
-    pub fn scheduled(update: &SoftwareRequestUpdateModule) -> Self {
+    pub fn scheduled(update: &SoftwareModulesUpdateRequest) -> Self {
         Self {
             update: update.clone(),
             status: UpdateStatus::Scheduled,
         }
     }
 
-    pub fn cancelled(update: &SoftwareRequestUpdateModule) -> Self {
+    pub fn cancelled(update: &SoftwareModulesUpdateRequest) -> Self {
         Self {
             update: update.clone(),
             status: UpdateStatus::Cancelled,
@@ -160,6 +163,7 @@ pub enum SoftwareOperationResultStatus {
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SoftwareRequestResponse {
+    // TODO: Is this the right approach, maybe nanoid?
     pub id: usize,
     pub status: SoftwareOperationResultStatus,
 
@@ -169,10 +173,12 @@ pub struct SoftwareRequestResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_software_list: Option<ListSoftwareListResponseList>,
 
+    // TODO: Make it vec and use is_empty instead of Option
     #[serde(skip_serializing_if = "Option::is_none")]
     pub failures: Option<ListSoftwareListResponseList>,
 }
 
+// TODO: Add methods to to handle response changes, eg add_failure, update reason ...
 impl SoftwareRequestResponse {
     pub fn from_json(json_str: &str) -> Result<Self, SoftwareError> {
         Ok(serde_json::from_str(json_str)?)
@@ -210,14 +216,14 @@ mod tests {
 
     #[test]
     fn serde_software_request_update() {
-        let debian_module1 = SoftwareRequestUpdateModule {
+        let debian_module1 = SoftwareModulesUpdateRequest {
             name: "debian1".into(),
             version: Some("0.0.1".into()),
             action: SoftwareRequestUpdateAction::Install,
             url: None,
         };
 
-        let debian_module2 = SoftwareRequestUpdateModule {
+        let debian_module2 = SoftwareModulesUpdateRequest {
             name: "debian2".into(),
             version: Some("0.0.2".into()),
             action: SoftwareRequestUpdateAction::Install,
@@ -229,7 +235,7 @@ mod tests {
             list: vec![debian_module1, debian_module2],
         };
 
-        let docker_module1 = SoftwareRequestUpdateModule {
+        let docker_module1 = SoftwareModulesUpdateRequest {
             name: "docker1".into(),
             version: Some("0.0.1".into()),
             action: SoftwareRequestUpdateAction::Remove,

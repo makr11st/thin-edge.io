@@ -1,4 +1,4 @@
-use crate::message::SoftwareRequestUpdateModule;
+use crate::message::SoftwareModulesUpdateRequest;
 use mqtt_client::Topic;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -151,7 +151,7 @@ pub enum SoftwareError {
 
     #[error("Failed to install {module:?}")]
     Install {
-        module: SoftwareRequestUpdateModule,
+        module: SoftwareModulesUpdateRequest,
         reason: String,
     },
 
@@ -169,7 +169,7 @@ pub enum SoftwareError {
 
     #[error("Failed to uninstall {module:?}")]
     Uninstall {
-        module: SoftwareRequestUpdateModule,
+        module: SoftwareModulesUpdateRequest,
         reason: String,
     },
 
