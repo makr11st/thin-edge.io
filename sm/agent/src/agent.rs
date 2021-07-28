@@ -4,14 +4,16 @@ use crate::{
 };
 use log::{debug, error, info};
 use mqtt_client::{Client, Message, MqttClient, Topic, TopicFilter};
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 use tedge_config::TEdgeConfigLocation;
-use tedge_sm_lib::{error::SoftwareError, message::*, plugin_manager::*, software::*};
+use tedge_sm_lib::{error::SoftwareError, message::*, plugin_manager::*};
 use tedge_users::{UserManager, ROOT_USER};
 
 #[derive(Debug)]
 pub struct SmAgentConfig {
-    pub request_topic: TopicFilter,
+    pub request_topics: TopicFilter,
+    pub request_topic_list: Topic,
+    pub request_topic_update: Topic,
     pub response_topic_list: Topic,
     pub response_topic_update: Topic,
     pub errors_topic: Topic,
@@ -22,6 +24,12 @@ impl Default for SmAgentConfig {
     fn default() -> Self {
         let request_topic =
             TopicFilter::new("tedge/commands/req/software/#").expect("Invalid topic");
+
+        let request_topic_list =
+            Topic::new("tedge/commands/req/software/list").expect("Invalid topic");
+
+        let request_topic_update =
+            Topic::new("tedge/commands/req/software/update").expect("Invalid topic");
 
         let response_topic_list =
             Topic::new("tedge/commands/res/software/list").expect("Invalid topic");
@@ -34,7 +42,9 @@ impl Default for SmAgentConfig {
         let mqtt_client_config = mqtt_client::Config::default().with_packet_size(50 * 1024);
 
         Self {
-            request_topic,
+            request_topics: request_topic,
+            request_topic_list,
+            request_topic_update,
             response_topic_list,
             response_topic_update,
             errors_topic,
@@ -101,15 +111,14 @@ impl SmAgent {
         mqtt: &Client,
         plugins: &Arc<ExternalPlugins>,
     ) -> Result<(), AgentError> {
-        let mut operations = mqtt.subscribe(self.config.request_topic.clone()).await?;
+        let mut operations = mqtt.subscribe(self.config.request_topics.clone()).await?;
+        let software_list_request = &self.config.request_topic_list;
+        let software_update_request = &self.config.request_topic_update;
         while let Some(message) = operations.next().await {
             info!("Request {:?}", message);
 
-            let operation: SoftwareOperation = message.topic.clone().into();
-            dbg!(&operation);
-
-            match operation {
-                SoftwareOperation::CurrentSoftwareList => {
+            match &message.topic {
+                topic if topic == software_list_request => {
                     self.handle_software_list_request(
                         mqtt,
                         plugins.clone(),
@@ -119,7 +128,7 @@ impl SmAgent {
                     .await?;
                 }
 
-                SoftwareOperation::SoftwareUpdates => {
+                topic if topic == software_update_request => {
                     self.handle_software_update_request(
                         mqtt,
                         plugins.clone(),
@@ -129,7 +138,7 @@ impl SmAgent {
                     .await?;
                 }
 
-                SoftwareOperation::UnknownOperation => self.handle_unknown_operation(),
+                _ => self.handle_unknown_operation(),
             }
         }
 
@@ -208,8 +217,7 @@ impl SmAgent {
                 operation: None,
             },
         } {
-            let operation = SoftwareOperation::from_str(operation_string.as_str())?;
-            let topic = match operation {
+            let topic = match operation_string.into() {
                 SoftwareOperation::CurrentSoftwareList => &self.config.response_topic_list,
 
                 SoftwareOperation::SoftwareUpdates => &self.config.response_topic_update,
@@ -307,4 +315,22 @@ async fn publish_capabilities(mqtt: &Client) -> Result<(), AgentError> {
         .await?;
 
     Ok(())
+}
+
+/// Variants of supported software operations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SoftwareOperation {
+    CurrentSoftwareList,
+    SoftwareUpdates,
+    UnknownOperation,
+}
+
+impl From<String> for SoftwareOperation {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            r#"list"# => Self::CurrentSoftwareList,
+            r#"update"# => Self::SoftwareUpdates,
+            _ => Self::UnknownOperation,
+        }
+    }
 }
