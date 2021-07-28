@@ -1,7 +1,4 @@
-use crate::{
-    error::SoftwareError,
-    software::*,
-};
+use crate::{error::SoftwareError, software::*};
 use serde::{Deserialize, Serialize};
 
 pub trait Jsonify<'a>
@@ -111,7 +108,7 @@ impl Into<SoftwareModule> for SoftwareModuleItem {
         SoftwareModule {
             name: self.name,
             version: self.version,
-            url: self.url
+            url: self.url,
         }
     }
 }
@@ -137,7 +134,7 @@ impl From<SoftwareModule> for SoftwareModuleItem {
             version: module.version,
             url: module.url,
             action: None,
-            reason: None
+            reason: None,
         }
     }
 }
@@ -150,14 +147,14 @@ impl From<SoftwareModuleUpdate> for SoftwareModuleItem {
                 version: module.version,
                 url: module.url,
                 action: Some(SoftwareModuleAction::Install),
-                reason: None
+                reason: None,
             },
             SoftwareModuleUpdate::Remove { module } => SoftwareModuleItem {
                 name: module.name,
                 version: module.version,
                 url: module.url,
                 action: Some(SoftwareModuleAction::Remove),
-                reason: None
+                reason: None,
             },
         }
     }

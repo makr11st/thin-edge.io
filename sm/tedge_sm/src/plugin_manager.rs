@@ -98,7 +98,10 @@ impl ExternalPlugins {
         let mut complete_software_list = Vec::new();
         for software_type in self.plugin_map.keys() {
             let software_list = self.plugin(&software_type)?.list()?;
-            let plugin_software_list= software_list.into_iter().map(|item| item.into()).collect::<Vec<SoftwareModuleItem>>();
+            let plugin_software_list = software_list
+                .into_iter()
+                .map(|item| item.into())
+                .collect::<Vec<SoftwareModuleItem>>();
 
             complete_software_list.push(SoftwareRequestResponseSoftwareList {
                 plugin_type: software_type.clone(),
@@ -152,8 +155,14 @@ impl ExternalPlugins {
         items: &[SoftwareModuleItem],
         plugin: &ExternalPluginCommand,
     ) -> Vec<SoftwareModuleItem> {
-        let updates = items.iter().filter_map(|item| item.clone().into()).collect::<Vec<SoftwareModuleUpdate>>();
+        let updates = items
+            .iter()
+            .filter_map(|item| item.clone().into())
+            .collect::<Vec<SoftwareModuleUpdate>>();
         let failed_updates = plugin.apply_all(&updates);
-        failed_updates.into_iter().map(|update_result| update_result.into()).collect::<Vec<SoftwareModuleItem>>()
+        failed_updates
+            .into_iter()
+            .map(|update_result| update_result.into())
+            .collect::<Vec<SoftwareModuleItem>>()
     }
 }

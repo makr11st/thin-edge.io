@@ -1,7 +1,4 @@
-use crate::{
-    error::SoftwareError,
-    software::*,
-};
+use crate::{error::SoftwareError, software::*};
 use std::{
     iter::Iterator,
     path::PathBuf,
@@ -18,8 +15,8 @@ pub trait Plugin {
 
     fn apply(&self, update: &SoftwareModuleUpdate) -> Result<(), SoftwareError> {
         match update {
-            SoftwareModuleUpdate::Install { module} => self.install(&module),
-            SoftwareModuleUpdate::Remove { module} => self.remove(&module),
+            SoftwareModuleUpdate::Install { module } => self.install(&module),
+            SoftwareModuleUpdate::Remove { module } => self.remove(&module),
         }
     }
 
