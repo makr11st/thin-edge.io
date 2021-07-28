@@ -4,7 +4,7 @@ use crate::{
         self, SoftwareOperationStatus, SoftwareRequestResponse, SoftwareRequestResponseSoftwareList,
     },
     plugin::*,
-    software::{SoftwareModule, SoftwareModuleAction},
+    software::*,
 };
 use std::{collections::HashMap, fs, io, path::PathBuf};
 
@@ -97,8 +97,13 @@ impl ExternalPlugins {
     pub fn list(&self) -> Result<Vec<SoftwareRequestResponseSoftwareList>, SoftwareError> {
         let mut complete_software_list = Vec::new();
         for software_type in self.plugin_map.keys() {
-            let plugin_software_list = self.plugin(&software_type)?.list()?;
-            complete_software_list.push(plugin_software_list);
+            let software_list = self.plugin(&software_type)?.list()?;
+            let plugin_software_list= software_list.into_iter().map(|item| item.into()).collect::<Vec<SoftwareModuleItem>>();
+
+            complete_software_list.push(SoftwareRequestResponseSoftwareList {
+                plugin_type: software_type.clone(),
+                list: plugin_software_list,
+            });
         }
         Ok(complete_software_list)
     }
@@ -144,25 +149,11 @@ impl ExternalPlugins {
 
     fn install_or_remove(
         &self,
-        actions: &[SoftwareModule],
+        items: &[SoftwareModuleItem],
         plugin: &ExternalPluginCommand,
-    ) -> Vec<SoftwareModule> {
-        let mut failed_actions = Vec::new();
-
-        for module in actions.iter() {
-            let status = match module.action {
-                Some(SoftwareModuleAction::Install) => plugin.install(&module),
-                Some(SoftwareModuleAction::Remove) => plugin.remove(&module),
-                None => continue,
-            };
-
-            if status.is_err() {
-                let mut error = module.clone();
-                error.reason = Some("Action failed".into());
-                let () = failed_actions.push(error);
-            };
-        }
-
-        failed_actions
+    ) -> Vec<SoftwareModuleItem> {
+        let updates = items.iter().filter_map(|item| item.clone().into()).collect::<Vec<SoftwareModuleUpdate>>();
+        let failed_updates = plugin.apply_all(&updates);
+        failed_updates.into_iter().map(|update_result| update_result.into()).collect::<Vec<SoftwareModuleItem>>()
     }
 }

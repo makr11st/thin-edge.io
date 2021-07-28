@@ -1,7 +1,6 @@
 use crate::{
     error::SoftwareError,
-    message::SoftwareRequestResponseSoftwareList,
-    software::{SoftwareModule, SoftwareType},
+    software::*,
 };
 use std::{
     iter::Iterator,
@@ -14,17 +13,29 @@ pub trait Plugin {
     fn install(&self, module: &SoftwareModule) -> Result<(), SoftwareError>;
     fn remove(&self, module: &SoftwareModule) -> Result<(), SoftwareError>;
     fn finalize(&self) -> Result<(), SoftwareError>;
-    fn list(&self) -> Result<SoftwareRequestResponseSoftwareList, SoftwareError>;
+    fn list(&self) -> Result<Vec<SoftwareModule>, SoftwareError>;
     fn version(&self, module: &SoftwareModule) -> Result<Option<String>, SoftwareError>;
 
-    // fn apply(&self, update: &SoftwareModulesUpdateRequest) -> SoftwareRequestUpdateStatus {
-    //     let result = match update.action {
-    //         SoftwareRequestUpdateAction::Install => self.install(&update),
-    //         SoftwareRequestUpdateAction::Remove => self.remove(&update),
-    //     };
+    fn apply(&self, update: &SoftwareModuleUpdate) -> Result<(), SoftwareError> {
+        match update {
+            SoftwareModuleUpdate::Install { module} => self.install(&module),
+            SoftwareModuleUpdate::Remove { module} => self.remove(&module),
+        }
+    }
 
-    //     SoftwareRequestUpdateStatus::new(update, result)
-    // }
+    fn apply_all(&self, updates: &Vec<SoftwareModuleUpdate>) -> Vec<SoftwareModuleUpdateResult> {
+        let mut failed_updates = Vec::new();
+        self.prepare();
+        for update in updates.iter() {
+            if let Err(error) = self.apply(update) {
+                let () = failed_updates.push(SoftwareModuleUpdateResult {
+                    update: update.clone(),
+                    error: Some(error),
+                });
+            };
+        }
+        failed_updates
+    }
 }
 
 #[derive(Debug)]
@@ -85,7 +96,7 @@ impl ExternalPluginCommand {
 
 const PREPARE: &str = "prepare";
 const INSTALL: &str = "install";
-const UNINSTALL: &str = "uninstall";
+const REMOVE: &str = "remove";
 const FINALIZE: &str = "finalize";
 const LIST: &str = "list";
 const VERSION: &str = "version";
@@ -119,7 +130,7 @@ impl Plugin for ExternalPluginCommand {
     }
 
     fn remove(&self, module: &SoftwareModule) -> Result<(), SoftwareError> {
-        let command = self.command(UNINSTALL, Some(module))?;
+        let command = self.command(REMOVE, Some(module))?;
         let output = self.execute(command)?;
 
         if output.status.success() {
@@ -145,29 +156,26 @@ impl Plugin for ExternalPluginCommand {
         }
     }
 
-    fn list(&self) -> Result<SoftwareRequestResponseSoftwareList, SoftwareError> {
+    fn list(&self) -> Result<Vec<SoftwareModule>, SoftwareError> {
         let command = self.command(LIST, None)?;
         let output = self.execute(command)?;
-        let mut software_list = Vec::new();
-        let mystr = output.stdout;
-
-        mystr
-            .split(|n: &u8| n.is_ascii_whitespace())
-            .filter(|split| !split.is_empty())
-            .for_each(|split: &[u8]| {
-                let software_json_line = std::str::from_utf8(split).unwrap();
-                let software_module =
-                    serde_json::from_str::<SoftwareModule>(software_json_line).unwrap();
-                software_list.push(software_module);
-            });
 
         if output.status.success() {
-            let list_software_list = SoftwareRequestResponseSoftwareList {
-                plugin_type: self.name.clone(),
-                list: software_list,
-            };
-            dbg!(&list_software_list);
-            Ok(list_software_list)
+            let mut software_list = Vec::new();
+            let mystr = output.stdout;
+
+            mystr
+                .split(|n: &u8| n.is_ascii_whitespace())
+                .filter(|split| !split.is_empty())
+                .for_each(|split: &[u8]| {
+                    let software_json_line = std::str::from_utf8(split).unwrap();
+                    let software_module =
+                        serde_json::from_str::<SoftwareModule>(software_json_line).unwrap();
+                    software_list.push(software_module);
+                });
+
+            dbg!(&software_list);
+            Ok(software_list)
         } else {
             Err(SoftwareError::Plugin {
                 software_type: self.name.clone(),

@@ -1,6 +1,5 @@
 use crate::error::SoftwareError;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 pub type SoftwareType = String;
 pub type SoftwareName = String;
@@ -18,7 +17,7 @@ pub enum SoftwareModuleAction {
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
-pub struct SoftwareModule {
+pub struct SoftwareModuleItem {
     pub name: SoftwareName,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -35,9 +34,20 @@ pub struct SoftwareModule {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub enum UpdateStatus {
-    Scheduled,
-    Success,
-    Error { reason: SoftwareError },
-    Cancelled,
+pub struct SoftwareModule {
+    pub name: SoftwareName,
+    pub version: Option<SoftwareVersion>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub enum SoftwareModuleUpdate {
+    Install { module: SoftwareModule },
+    Remove { module: SoftwareModule },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct SoftwareModuleUpdateResult {
+    pub update: SoftwareModuleUpdate,
+    pub error: Option<SoftwareError>,
 }

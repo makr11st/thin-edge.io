@@ -1,6 +1,6 @@
 use crate::{
     error::SoftwareError,
-    software::{SoftwareModule, SoftwareType},
+    software::*,
 };
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +53,7 @@ impl<'a> Jsonify<'a> for SoftwareRequestUpdate {}
 pub struct SoftwareRequestResponseSoftwareList {
     #[serde(rename = "type")]
     pub plugin_type: SoftwareType,
-    pub list: Vec<SoftwareModule>,
+    pub list: Vec<SoftwareModuleItem>,
 }
 
 /// Possible statuses for result of Software operation.
@@ -106,6 +106,71 @@ impl SoftwareRequestResponse {
     }
 }
 
+impl Into<SoftwareModule> for SoftwareModuleItem {
+    fn into(self) -> SoftwareModule {
+        SoftwareModule {
+            name: self.name,
+            version: self.version,
+            url: self.url
+        }
+    }
+}
+
+impl Into<Option<SoftwareModuleUpdate>> for SoftwareModuleItem {
+    fn into(self) -> Option<SoftwareModuleUpdate> {
+        match self.action {
+            Some(SoftwareModuleAction::Install) => Some(SoftwareModuleUpdate::Install {
+                module: self.into(),
+            }),
+            Some(SoftwareModuleAction::Remove) => Some(SoftwareModuleUpdate::Remove {
+                module: self.into(),
+            }),
+            None => None,
+        }
+    }
+}
+
+impl From<SoftwareModule> for SoftwareModuleItem {
+    fn from(module: SoftwareModule) -> Self {
+        SoftwareModuleItem {
+            name: module.name,
+            version: module.version,
+            url: module.url,
+            action: None,
+            reason: None
+        }
+    }
+}
+
+impl From<SoftwareModuleUpdate> for SoftwareModuleItem {
+    fn from(update: SoftwareModuleUpdate) -> Self {
+        match update {
+            SoftwareModuleUpdate::Install { module } => SoftwareModuleItem {
+                name: module.name,
+                version: module.version,
+                url: module.url,
+                action: Some(SoftwareModuleAction::Install),
+                reason: None
+            },
+            SoftwareModuleUpdate::Remove { module } => SoftwareModuleItem {
+                name: module.name,
+                version: module.version,
+                url: module.url,
+                action: Some(SoftwareModuleAction::Remove),
+                reason: None
+            },
+        }
+    }
+}
+
+impl From<SoftwareModuleUpdateResult> for SoftwareModuleItem {
+    fn from(result: SoftwareModuleUpdateResult) -> Self {
+        let mut msg: SoftwareModuleItem = result.update.into();
+        msg.reason = result.error.map(|err| format!("{}", err));
+        msg
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -129,7 +194,7 @@ mod tests {
 
     #[test]
     fn serde_software_request_update() {
-        let debian_module1 = SoftwareModule {
+        let debian_module1 = SoftwareModuleItem {
             name: "debian1".into(),
             version: Some("0.0.1".into()),
             action: Some(SoftwareModuleAction::Install),
@@ -137,7 +202,7 @@ mod tests {
             reason: None,
         };
 
-        let debian_module2 = SoftwareModule {
+        let debian_module2 = SoftwareModuleItem {
             name: "debian2".into(),
             version: Some("0.0.2".into()),
             action: Some(SoftwareModuleAction::Install),
@@ -150,7 +215,7 @@ mod tests {
             list: vec![debian_module1, debian_module2],
         };
 
-        let docker_module1 = SoftwareModule {
+        let docker_module1 = SoftwareModuleItem {
             name: "docker1".into(),
             version: Some("0.0.1".into()),
             action: Some(SoftwareModuleAction::Remove),
@@ -224,7 +289,7 @@ mod tests {
 
     #[test]
     fn serde_software_list_some_modules_successful() {
-        let module1 = SoftwareModule {
+        let module1 = SoftwareModuleItem {
             name: "debian1".into(),
             version: Some("0.0.1".into()),
             action: None,
