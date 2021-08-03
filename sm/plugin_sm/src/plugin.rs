@@ -23,14 +23,11 @@ pub trait Plugin {
         }
     }
 
-    async fn apply_all(
-        &self,
-        updates: Vec<SoftwareModuleUpdate>,
-    ) -> Vec<SoftwareError> {
+    async fn apply_all(&self, updates: Vec<SoftwareModuleUpdate>) -> Vec<SoftwareError> {
         let mut failed_updates = Vec::new();
 
         if let Err(prepare_error) = self.prepare().await {
-            failed_updates.push (prepare_error);
+            failed_updates.push(prepare_error);
             return failed_updates;
         }
 
@@ -41,7 +38,7 @@ pub trait Plugin {
         }
 
         if let Err(finalize_error) = self.finalize().await {
-            failed_updates.push (finalize_error);
+            failed_updates.push(finalize_error);
         }
 
         failed_updates

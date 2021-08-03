@@ -105,10 +105,7 @@ impl ExternalPlugins {
         response
     }
 
-    pub async fn process(
-        &self,
-        request: &SoftwareUpdateRequest,
-    ) -> SoftwareUpdateResponse {
+    pub async fn process(&self, request: &SoftwareUpdateRequest) -> SoftwareUpdateResponse {
         let mut response = SoftwareUpdateResponse::new(request);
 
         for software_type in request.modules_types() {
@@ -116,19 +113,18 @@ impl ExternalPlugins {
                 let updates = request.updates_for(&software_type);
                 plugin.apply_all(updates).await
             } else {
-                vec![ SoftwareError::UnknownSoftwareType{ software_type: software_type.clone() } ]
+                vec![SoftwareError::UnknownSoftwareType {
+                    software_type: software_type.clone(),
+                }]
             };
 
-            response.add_errors(
-                &software_type,
-                errors
-            )
+            response.add_errors(&software_type, errors)
         }
 
         for (software_type, plugin) in self.plugin_map.iter() {
             match plugin.list().await {
                 Ok(software_list) => response.add_modules(&software_type, software_list),
-                Err(err) => response.add_errors(&software_type, vec![err])
+                Err(err) => response.add_errors(&software_type, vec![err]),
             }
         }
 
