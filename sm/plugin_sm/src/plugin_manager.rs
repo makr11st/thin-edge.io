@@ -105,7 +105,7 @@ impl ExternalPlugins {
 
             complete_software_list.push(SoftwareRequestResponseSoftwareList {
                 plugin_type: software_type.clone(),
-                list: plugin_software_list,
+                modules: plugin_software_list,
             });
         }
         Ok(complete_software_list)
@@ -113,41 +113,41 @@ impl ExternalPlugins {
 
     pub async fn process(
         &self,
-        request: &SoftwareRequestUpdate,
+        request: &[SoftwareModuleUpdate],
     ) -> Result<SoftwareRequestResponse, PluginError> {
-        let mut response = SoftwareRequestResponse {
-            id: request.id,
-            status: SoftwareOperationStatus::Failed,
-            reason: None,
-            current_software_list: Vec::new(),
-            failures: Vec::new(),
-        };
+        // let mut response = SoftwareRequestResponse {
+        //     id: request.id,
+        //     status: SoftwareOperationStatus::Failed,
+        //     reason: None,
+        //     current_software_list: Some(Vec::new()),
+        //     failures: Vec::new(),
+        // };
 
-        for software_list_type in &request.update_list {
-            let plugin = self
-                .by_software_type(&software_list_type.plugin_type)
-                .unwrap();
+        let mut response = SoftwareRequestResponse::new(1, SoftwareOperationStatus::Failed);
 
-            // What to do if prepare fails?
-            // What should be in failures list?
-            if let Err(e) = plugin.prepare().await {
-                response.reason = Some(format!("Failed prepare stage: {}", e));
+        // for software_list_type in request {
+        //     let plugin = self.by_software_type(&software_list_type).unwrap();
 
-                continue;
-            };
+        //     // What to do if prepare fails?
+        //     // What should be in failures list?
+        //     if let Err(e) = plugin.prepare().await {
+        //         response.reason = Some(format!("Failed prepare stage: {}", e));
 
-            let failed_actions = self
-                .install_or_remove(&software_list_type.list, plugin)
-                .await;
+        //         continue;
+        //     };
 
-            // What to do if finalize fails?
-            let () = plugin.finalize().await?;
+        //     let failed_actions = self
+        //         .install_or_remove(&software_list_type.list, plugin)
+        //         .await;
 
-            response.failures.push(SoftwareRequestResponseSoftwareList {
-                plugin_type: plugin.name.clone(),
-                list: failed_actions,
-            });
-        }
+        //     // What to do if finalize fails?
+        //     let () = plugin.finalize().await?;
+
+        //     response.failures.push(SoftwareRequestResponseSoftwareList {
+        //         plugin_type: plugin.name.clone(),
+        //         modules: failed_actions,
+        //     });
+        // }
 
         Ok(response)
     }
@@ -157,14 +157,16 @@ impl ExternalPlugins {
         items: &[SoftwareModuleItem],
         plugin: &ExternalPluginCommand,
     ) -> Vec<SoftwareModuleItem> {
-        let updates = items
-            .iter()
-            .filter_map(|item| item.clone().into())
-            .collect::<Vec<SoftwareModuleUpdate>>();
-        let failed_updates = plugin.apply_all(&updates).await;
-        failed_updates
-            .into_iter()
-            .map(|update_result| update_result.into())
-            .collect::<Vec<SoftwareModuleItem>>()
+        // let updates = items
+        //     .iter()
+        //     .filter_map(|item| item.clone().into())
+        //     .collect::<Vec<SoftwareModuleUpdate>>();
+
+        // let failed_updates = plugin.apply_all(&updates).await;
+        // failed_updates
+        //     .into_iter()
+        //     .map(|update_result| update_result.into())
+        //     .collect::<Vec<SoftwareModuleItem>>()
+        Vec::new()
     }
 }
