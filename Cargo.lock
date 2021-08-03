@@ -97,13 +97,13 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "1.0.3"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2475b58cd94eb4f70159f4fd8844ba3b807532fe3131b3373fae060bbe30396"
+checksum = "c98233c6673d8601ab23e77eb38f999c51100d46c5703b17288c57fddf3a1ffe"
 dependencies = [
  "bstr",
  "doc-comment",
- "predicates 1.0.7",
+ "predicates 2.0.1",
  "predicates-core",
  "predicates-tree",
  "wait-timeout",
@@ -721,6 +721,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "float-cmp"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "flockfile"
 version = "0.2.3"
 dependencies = [
@@ -1104,9 +1113,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47be2f14c678be2fdcab04ab1171db51b2762ce6f0a8ee87c8dd4a04ed216135"
+checksum = "68f2d64f2edebec4ce84ad108148e67e1064789bee435edc5b60ad398714a3a9"
 
 [[package]]
 name = "itertools"
@@ -1523,9 +1532,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.7.2"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
+checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
 
 [[package]]
 name = "oorandom"
@@ -1651,6 +1660,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "plugin_sm"
+version = "0.2.3"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "env_logger 0.9.0",
+ "json_sm",
+ "log",
+ "serde",
+ "serde_json",
+ "structopt",
+ "thiserror",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "pollster"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1669,7 +1695,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eeb433456c1a57cc93554dea3ce40b4c19c4057e41c55d4a0f3d84ea71c325aa"
 dependencies = [
  "difference",
- "float-cmp",
+ "float-cmp 0.8.0",
  "normalize-line-endings",
  "predicates-core",
  "regex",
@@ -1677,12 +1703,12 @@ dependencies = [
 
 [[package]]
 name = "predicates"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6e46ca79eb4e21e2ec14430340c71250ab69332abf85521c95d3a8bc336aa76"
+checksum = "bc3d91237f5de3bcd9d927e24d03b495adb6135097b001cea7403e2d573d00a9"
 dependencies = [
  "difflib",
- "float-cmp",
+ "float-cmp 0.9.0",
  "itertools 0.10.0",
  "normalize-line-endings",
  "predicates-core",
@@ -2022,9 +2048,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.2"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf12057f289428dbf5c591c74bf10392e4a8003f993405a902f20117019022d4"
+checksum = "246e9f61b9bb77df069a947682be06e31ac43ea37862e244a69f177694ea6d22"
 dependencies = [
  "base64",
  "bytes",
@@ -2460,7 +2486,7 @@ dependencies = [
  "mockito",
  "mqtt_client",
  "pem",
- "predicates 2.0.0",
+ "predicates 2.0.1",
  "reqwest",
  "rpassword",
  "rustls",
@@ -2476,6 +2502,39 @@ dependencies = [
  "url",
  "webpki",
  "which",
+]
+
+[[package]]
+name = "tedge_agent"
+version = "0.2.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clock",
+ "env_logger 0.9.0",
+ "flockfile",
+ "futures",
+ "json_sm",
+ "log",
+ "mockall",
+ "mqtt_client",
+ "once_cell",
+ "plugin_sm",
+ "rumqttd",
+ "rumqttlog",
+ "serde",
+ "serde_json",
+ "structopt",
+ "tedge_config",
+ "tedge_users",
+ "tedge_utils",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2664,9 +2723,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.8.1"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98c8b05dc14c75ea83d63dd391100353789f5f24b8b3866542a5e85c8be8e985"
+checksum = "4b7b349f11a7047e6d1276853e612d152f5e8a352c61917887cc2169e2366b4c"
 dependencies = [
  "autocfg",
  "bytes",
@@ -3168,11 +3227,12 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "4.1.0"
+version = "4.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b55551e42cbdf2ce2bedd2203d0cc08dba002c27510f86dab6d0ce304cba3dfe"
+checksum = "ea187a8ef279bc014ec368c27a920da2024d2a711109bfbe3440585d5cf27ad9"
 dependencies = [
  "either",
+ "lazy_static",
  "libc",
 ]
 

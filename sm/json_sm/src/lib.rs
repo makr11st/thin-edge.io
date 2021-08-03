@@ -1,6 +1,6 @@
-mod error;
-mod messages;
-mod software;
+pub mod error;
+pub mod messages;
+pub mod software;
 
 pub use error::*;
 pub use messages::{
