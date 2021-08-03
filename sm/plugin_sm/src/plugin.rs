@@ -1,6 +1,9 @@
 use crate::error::PluginError;
 use async_trait::async_trait;
-use json_sm::{SoftwareModule, SoftwareModuleUpdate, SoftwareType};
+use json_sm::{
+    messages::SoftwareRequestResponseSoftwareList, SoftwareModule, SoftwareModuleUpdate,
+    SoftwareType,
+};
 use std::{
     iter::Iterator,
     path::PathBuf,
@@ -24,7 +27,10 @@ pub trait Plugin {
         }
     }
 
-    async fn apply_all(&self, updates: &[SoftwareModuleUpdate]) -> Vec<SoftwareModuleUpdateResult> {
+    async fn apply_all(
+        &self,
+        updates: &[SoftwareModuleUpdate],
+    ) -> Vec<SoftwareRequestResponseSoftwareList> {
         let mut failed_updates = Vec::new();
 
         // TODO: Implement proper handling of results here.
@@ -32,10 +38,10 @@ pub trait Plugin {
 
         for update in updates.iter() {
             if let Err(error) = self.apply(update).await {
-                let () = failed_updates.push(SoftwareModuleUpdateResult {
-                    update: update.clone(),
-                    error: Some(error),
-                });
+                // let () = failed_updates.push(SoftwareRequestResponseSoftwareList {
+                //     plugin_type: update.module.module_type.clone(),
+                //     error: Some(error),
+                // });
             };
         }
 

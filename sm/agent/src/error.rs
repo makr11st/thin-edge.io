@@ -1,5 +1,6 @@
+use json_sm::error::SoftwareError;
 use mqtt_client::MqttClientError;
-use tedge_sm_lib::error::SoftwareError;
+use plugin_sm::error::PluginError;
 use tedge_users::UserSwitchError;
 
 #[derive(Debug, thiserror::Error)]
@@ -15,6 +16,9 @@ pub enum AgentError {
 
     #[error("Couldn't load plugins from /etc/tedge/sm-plugins")]
     NoPlugins,
+
+    #[error(transparent)]
+    Plugin(#[from] PluginError),
 
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
