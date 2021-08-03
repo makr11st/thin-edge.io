@@ -182,8 +182,9 @@ impl Plugin for ExternalPluginCommand {
                 .filter(|split| !split.is_empty())
                 .for_each(|split: &[u8]| {
                     let software_json_line = std::str::from_utf8(split).unwrap();
-                    let software_module =
+                    let mut software_module =
                         serde_json::from_str::<SoftwareModule>(software_json_line).unwrap();
+                    software_module.module_type = self.name.clone();
                     software_list.push(software_module);
                 });
 

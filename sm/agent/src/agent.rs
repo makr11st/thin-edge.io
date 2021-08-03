@@ -282,7 +282,7 @@ impl SmAgent {
                 }
             };
 
-            let mut response = SoftwareErrorResponse::new(id, "unfinished operation request");
+            let response = SoftwareErrorResponse::new(id, "unfinished operation request");
 
             let _ = mqtt
                 .publish(Message::new(topic, response.to_bytes()?))
