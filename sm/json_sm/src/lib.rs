@@ -5,7 +5,7 @@ pub mod software;
 pub use error::*;
 pub use messages::{
     Jsonify, SoftwareListRequest, SoftwareListResponse, SoftwareOperationStatus,
-    SoftwareUpdateRequest, SoftwareUpdateResponse,
+    SoftwareUpdateRequest, SoftwareUpdateResponse, SoftwareErrorResponse
 };
 pub use software::*;
 

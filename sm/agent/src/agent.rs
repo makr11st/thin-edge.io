@@ -2,17 +2,10 @@ use crate::{
     error::AgentError,
     state::{AgentStateRepository, State, StateRepository},
 };
-use json_sm::{
-    error::SoftwareError,
-    messages::{
-        SoftwareListRequest, SoftwareListResponse, SoftwareRequestResponse, SoftwareUpdateRequest,
-        SoftwareUpdateResponse,
-    },
-    Jsonify, SoftwareOperationStatus,
-};
+use json_sm::*;
 use log::{debug, error, info};
 use mqtt_client::{Client, Message, MqttClient, Topic, TopicFilter};
-use plugin_sm::plugin_manager::{self, ExternalPlugins};
+use plugin_sm::plugin_manager::ExternalPlugins;
 use std::sync::Arc;
 use tedge_config::TEdgeConfigLocation;
 use tedge_users::{UserManager, ROOT_USER};
@@ -195,19 +188,16 @@ impl SmAgent {
                 .into());
             }
         };
-        let mut response = SoftwareListResponse::new(&request); // defaults to executing
+        let executing_response = SoftwareListResponse::new(&request);
 
-        // Send status executing
         let _ = mqtt
             .publish(Message::new(
                 &self.config.response_topic_list,
-                response.to_bytes()?,
+                executing_response.to_bytes()?,
             ))
             .await?;
 
-        let current_software_list = plugins.list().await?;
-
-        // response.finalize_response(current_software_list);
+        let response = plugins.list(&request).await;
 
         let _ = mqtt
             .publish(Message::new(response_topic, response.to_bytes()?))
@@ -235,10 +225,6 @@ impl SmAgent {
                     })
                     .await?;
 
-                let () = self
-                    .publish_status_executing(mqtt, response_topic, request.id)
-                    .await?;
-
                 request
             }
 
@@ -255,15 +241,16 @@ impl SmAgent {
             }
         };
 
+        let executing_response = SoftwareUpdateResponse::new(&request);
+        let _ = mqtt
+            .publish(Message::new(
+                &self.config.response_topic_list,
+                executing_response.to_bytes()?,
+            ))
+            .await?;
+
         let _user_guard = self.user_manager.become_user(ROOT_USER)?;
-
-        let mut response = SoftwareUpdateResponse::new(&request);
-        // let mut response = plugins.process(&request).await?;
-
-        // let software_list = plugins.list().await?;
-
-        // let () = response.finalize_response(software_list.to_vec());
-
+        let response = plugins.process(&request).await;
         let _ = mqtt
             .publish(Message::new(response_topic, response.to_bytes()?))
             .await?;
@@ -295,28 +282,12 @@ impl SmAgent {
                 }
             };
 
-            let mut response = SoftwareRequestResponse::new(id, SoftwareOperationStatus::Failed);
-            response.reason = Some("unfinished operation request".into());
+            let mut response = SoftwareErrorResponse::new(id, "unfinished operation request");
 
             let _ = mqtt
                 .publish(Message::new(topic, response.to_bytes()?))
                 .await?;
         }
-
-        Ok(())
-    }
-
-    async fn publish_status_executing(
-        &self,
-        mqtt: &Client,
-        response_topic: &Topic,
-        id: usize,
-    ) -> Result<(), AgentError> {
-        let response = SoftwareRequestResponse::new(id, SoftwareOperationStatus::Executing);
-
-        let _ = mqtt
-            .publish(Message::new(response_topic, response.to_bytes()?))
-            .await?;
 
         Ok(())
     }
