@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Supported Operations Management for Cumulocity IoT - Thin Edge Book</title>
+        <title>Supported Operations Management for Cumulocity IoT - thin-edge.io docs</title>
                 
 
         <!-- Custom HTML head -->
@@ -111,7 +111,7 @@
                         </button>
                                             </div>
 
-                    <h1 class="menu-title">Thin Edge Book</h1>
+                    <h1 class="menu-title">thin-edge.io docs</h1>
 
                     <div class="right-buttons">
                                                 <a href="../print.html" title="Print this book" aria-label="Print this book">
@@ -152,11 +152,17 @@
 <li>reboot on demand</li>
 <li>install or remove software</li>
 </ul>
-<p>These operations that are supported by <a href="https://cumulocity.com/api/10.11.0/#section/Device-management-library">Cumulocity IoT</a> and other cloud providers.
+<p>These operations are supported by <a href="https://cumulocity.com/api/10.11.0/#section/Device-management-library">Cumulocity IoT</a> and other cloud providers.
 On <code>thin-edge.io</code> the support for one such operation can be added using the <code>thin-edge.io</code> Supported Operations API.</p>
 <h3 id="thin-edgeio-supported-operations-api"><a class="header" href="#thin-edgeio-supported-operations-api"><code>thin-edge.io</code> Supported Operations API</a></h3>
 <p>The Supported Operations utilises the file system to add and remove operations. A special file placed in <code>/etc/tedge/operations</code> directory will indicate that an operation is supported.
 The specification for the operation files is described in <code>thin-edge.io</code> specifications repository<a href="https://github.com/thin-edge/thin-edge.io-specs/blob/main/src/supported-operations/README.md">src/supported-operations/README.md</a></p>
+<p>Supported operations are declared in the cloud specific subdirectory of <code>/etc/tedge/operations</code> directory.</p>
+<h2 id="custom-supported-operations"><a class="header" href="#custom-supported-operations">Custom Supported Operations</a></h2>
+<p><code>thin-edge.io</code> supports custom operations by using configuration files and plugin mechanism similar to what software management agent does.</p>
+<p>The main difference between custom operations and native operations is that custom operations are have to be defined in configuration files and provide their own implementation in a callable <code>plugin</code> executable.
+As per specification the configuration file needs to be a <code>toml</code> file which describes the operation.</p>
+<p><code>thin-edge.io</code> stores the operations configuration files in the <code>/etc/tedge/operations/&lt;cloud-provider&gt;/</code> directory.</p>
 <h2 id="thin-edgeio-list-of-supported-operations"><a class="header" href="#thin-edgeio-list-of-supported-operations"><code>thin-edge.io</code> List of Supported Operations</a></h2>
 <p><code>thin-edge.io</code> supports natively the following operations:</p>
 <ul>
@@ -211,6 +217,45 @@ This operation will do the reboot of our device when we receive trigger from the
 <p>To remove supported operation we can remove the file from <code>/etc/tedge/operations/c8y</code> directory and restart the <code>tedge-mapper-c8y</code> to pick up the new list of supported operations. eg:</p>
 <pre><code class="language-shell">sudo rm /etc/tedge/operations/c8y/c8y_Restart
 </code></pre>
+<h2 id="working-with-custom-operations"><a class="header" href="#working-with-custom-operations">Working with custom operations</a></h2>
+<p>We will use the <code>thin-edge.io</code> Supported Operations API to add custom operations. Our new operation is going to be capability to execute shell commands on the device.
+Let's create the operation configuration file:</p>
+<p>We need to tell <code>thin-edge.io</code> how to handle the operation and how to execute it.</p>
+<h3 id="adding-new-custom-operation"><a class="header" href="#adding-new-custom-operation">Adding new custom operation</a></h3>
+<p>In Cumulocity IoT we know that there is an operation call c8y_Command which allows us to send commands to the device and get the result back to the cloud, let's create the configuration file for our new operation:</p>
+<p>First we create a file with the name of the operation:</p>
+<pre><code class="language-shell">sudo -u tedge touch /etc/tedge/operations/c8y/c8y_Command
+</code></pre>
+<blockquote>
+<p>Note: the needs to be readable by <code>thin-edge.io</code> user - <code>tedge</code> - and should have permissions <code>644</code>.</p>
+</blockquote>
+<p>In this example we want <code>thin-edge.io</code> to pick up a message on specific topic and execute the command on the device, our topic is <code>c8y/s/ds</code>.
+We also know that the message we expect is going to use SmartRest template <code>511</code> and our plugin is located in <code>/etc/tedge/operations/command</code>.
+Then we need to add the configuration to the file (<code>/etc/tedge/operations/c8y/c8y_Command</code>):</p>
+<pre><code class="language-toml">[exec]
+  topic = &quot;c8y/s/ds&quot;
+  on_message = &quot;511&quot;
+  command = &quot;/etc/tedge/operations/command&quot;
+</code></pre>
+<p>And now the content of our command plugin:</p>
+<pre><code class="language-shell">#!/usr/bin/sh
+
+mosquitto_pub -t c8y/s/us -m 501,c8y_Command
+
+OUTPUT=$(echo $1)
+
+mosquitto_pub -t c8y/s/us -m 503,c8y_Command,&quot;$OUTPUT&quot;
+</code></pre>
+<p>This simple example will execute the command <code>echo $1</code> and send the result back to the cloud.</p>
+<blockquote>
+<p>Note: The command will be executed with tedge-mapper permission level so most of the system level commands will not work.</p>
+</blockquote>
+<h3 id="list-of-currently-supported-operations-parameters"><a class="header" href="#list-of-currently-supported-operations-parameters">List of currently supported operations parameters</a></h3>
+<ul>
+<li><code>topic</code> - The topic on which the operation will be executed.</li>
+<li><code>on_message</code> - The SmartRest template on which the operation will be executed.</li>
+<li><code>command</code> - The command to execute.</li>
+</ul>
 
                     </main>
 
