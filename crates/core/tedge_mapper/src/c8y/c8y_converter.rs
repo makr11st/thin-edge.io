@@ -78,7 +78,6 @@ impl CumulocityConverter {
         };
 
         let children: HashSet<String> = HashSet::new();
-
         CumulocityConverter {
             size_threshold,
             children,
