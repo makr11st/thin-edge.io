@@ -1,8 +1,11 @@
-use crate::sm_c8y_mapper::error::SMCumulocityMapperError;
-use crate::sm_c8y_mapper::json_c8y::{
-    C8yCreateEvent, C8yManagedObject, C8yUpdateSoftwareListResponse, InternalIdResponse,
+use crate::c8y::{
+    error::SMCumulocityMapperError,
+    json_c8y::{
+        C8yCreateEvent, C8yManagedObject, C8yUpdateSoftwareListResponse, InternalIdResponse,
+    },
+    mapper::SmartRestLogEvent,
 };
-use crate::sm_c8y_mapper::mapper::SmartRestLogEvent;
+
 use async_trait::async_trait;
 use c8y_smartrest::smartrest_deserializer::SmartRestJwtResponse;
 use chrono::{DateTime, Local};
@@ -207,7 +210,7 @@ impl JwtAuthHttpProxy {
         };
 
         C8yCreateEvent::new(
-            c8y_managed_object.to_owned(),
+            c8y_managed_object,
             "c8y_Logfile",
             &local.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
             "software-management",

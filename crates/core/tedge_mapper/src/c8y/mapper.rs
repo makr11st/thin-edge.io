@@ -1,11 +1,15 @@
 use crate::{
-    component::TEdgeComponent,
-    operations::Operations,
-    sm_c8y_mapper::{
+    c8y::{
         error::*,
         http_proxy::{C8YHttpProxy, JwtAuthHttpProxy},
         json_c8y::C8yUpdateSoftwareListResponse,
         topic::*,
+    },
+    mapper::{
+        component::TEdgeComponent,
+        mapper::{create_mapper, mqtt_config},
+        operations::Operations,
+        size_threshold::SizeThreshold,
     },
 };
 
@@ -14,15 +18,15 @@ use agent_interface::{
     SoftwareListRequest, SoftwareListResponse, SoftwareUpdateResponse,
 };
 use async_trait::async_trait;
-use c8y_smartrest::smartrest_deserializer::{SmartRestLogRequest, SmartRestRestartRequest};
-use c8y_smartrest::smartrest_serializer::CumulocitySupportedOperations;
 use c8y_smartrest::{
     error::SmartRestDeserializerError,
-    smartrest_deserializer::SmartRestUpdateSoftware,
+    smartrest_deserializer::{
+        SmartRestLogRequest, SmartRestRestartRequest, SmartRestUpdateSoftware,
+    },
     smartrest_serializer::{
-        SmartRestGetPendingOperations, SmartRestSerializer, SmartRestSetOperationToExecuting,
-        SmartRestSetOperationToFailed, SmartRestSetOperationToSuccessful,
-        SmartRestSetSupportedLogType,
+        CumulocitySupportedOperations, SmartRestGetPendingOperations, SmartRestSerializer,
+        SmartRestSetOperationToExecuting, SmartRestSetOperationToFailed,
+        SmartRestSetOperationToSuccessful, SmartRestSetSupportedLogType,
     },
 };
 use chrono::{DateTime, FixedOffset};
@@ -34,6 +38,8 @@ use std::path::PathBuf;
 use std::{convert::TryInto, process::Stdio};
 use tedge_config::{ConfigSettingAccessor, MqttPortSetting, TEdgeConfig};
 use tracing::{debug, error, info, instrument};
+
+use super::c8y_converter::CumulocityConverter;
 
 const AGENT_LOG_DIR: &str = "/var/log/tedge/agent";
 const SM_MAPPER: &str = "SM-C8Y-Mapper";
@@ -87,6 +93,17 @@ impl CumulocitySoftwareManagementMapper {
 impl TEdgeComponent for CumulocitySoftwareManagementMapper {
     #[instrument(skip(self, tedge_config), name = "sm-c8y-mapper")]
     async fn start(&self, tedge_config: TEdgeConfig) -> Result<(), anyhow::Error> {
+        // let size_threshold = SizeThreshold(16 * 1024);
+
+        // let converter = Box::new(CumulocityConverter::new(size_threshold));
+
+        // let mut mapper2 = create_mapper(CUMULOCITY_MAPPER_NAME, &tedge_config, converter).await?;
+
+        // mapper2
+        //     .run()
+        //     .instrument(info_span!(CUMULOCITY_MAPPER_NAME))
+        //     .await?;
+
         let operations = Operations::try_new("/etc/tedge/operations", "c8y")?;
         let http_proxy = JwtAuthHttpProxy::try_new(&tedge_config).await?;
         let mut sm_mapper =
@@ -125,9 +142,7 @@ where
         operations: Operations,
     ) -> Result<Self, anyhow::Error> {
         let mqtt_topic = CumulocitySoftwareManagementMapper::subscriptions(&operations)?;
-        let mqtt_port = tedge_config.query(MqttPortSetting)?.into();
-
-        let mqtt_config = crate::mapper::mqtt_config(SM_MAPPER, mqtt_port, mqtt_topic)?;
+        let mqtt_config = mqtt_config("SM-C8Y-Mapper", tedge_config, mqtt_topic)?;
         let client = Connection::new(&mqtt_config).await?;
 
         Ok(Self {

@@ -1,7 +1,4 @@
-use std::time::Duration;
-
-use crate::converter::*;
-use crate::error::*;
+use crate::mapper::{converter::*, error::*};
 
 use mqtt_channel::{
     Connection, Message, MqttError, SinkExt, StreamExt, TopicFilter, UnboundedReceiver,
@@ -21,8 +18,8 @@ pub async fn create_mapper<'a>(
     let mapper_config = converter.get_mapper_config();
     let mqtt_client = Connection::new(&mqtt_config(
         app_name,
-        mqtt_port,
-        mapper_config.in_topic_filter.clone().into(),
+        tedge_config,
+        mapper_config.in_topic_filter.clone(),
     )?)
     .await?;
 
@@ -35,7 +32,7 @@ pub async fn create_mapper<'a>(
     ))
 }
 
-pub(crate) fn mqtt_config(
+pub fn mqtt_config(
     name: &str,
     port: u16,
     topics: TopicFilter,
@@ -88,10 +85,10 @@ impl Mapper {
             let _ = self.output.send(init_message).await;
         }
 
-        // Start the sync phase here and process messages until the sync window times out
-        let _ = tokio::time::timeout(SYNC_WINDOW, async {
-            while let Some(message) = self.input.next().await {
-                self.process_message(message).await;
+        while let Some(message) = &mut self.input.next().await {
+            let converted_messages = self.converter.convert(message);
+            for converted_message in converted_messages.into_iter() {
+                let _ = self.output.send(converted_message).await;
             }
         })
         .await;

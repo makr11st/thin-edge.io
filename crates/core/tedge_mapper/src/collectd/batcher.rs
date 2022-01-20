@@ -6,7 +6,7 @@ use thin_edge_json::{
     serialize::ThinEdgeJsonSerializer,
 };
 
-use crate::collectd_mapper::{collectd::CollectdMessage, error::DeviceMonitorError};
+use crate::collectd::{collectd::CollectdMessage, error::DeviceMonitorError};
 use chrono::Local;
 use thin_edge_json::group::MeasurementGrouperError;
 

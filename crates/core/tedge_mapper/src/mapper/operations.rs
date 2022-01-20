@@ -1,3 +1,5 @@
+use crate::mapper::error::OperationsError;
+
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -5,8 +7,6 @@ use std::{
 };
 
 use serde::Deserialize;
-
-use crate::error::OperationsError;
 
 /// Operations are derived by reading files subdirectories per cloud /etc/tedge/operations directory
 /// Each operation is a file name in one of the subdirectories

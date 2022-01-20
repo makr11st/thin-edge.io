@@ -1,9 +1,11 @@
-use crate::c8y_fragments::{C8yAgentFragment, C8yDeviceDataFragment};
-use crate::error::*;
-use crate::size_threshold::SizeThreshold;
-use crate::{converter::*, operations::Operations};
-use c8y_smartrest::alarm;
-use c8y_smartrest::smartrest_serializer::{SmartRestSerializer, SmartRestSetSupportedOperations};
+use crate::mapper::{
+    converter::*, error::*, operations::Operations, size_threshold::SizeThreshold,
+};
+
+use c8y_smartrest::{
+    alarm,
+    smartrest_serializer::{SmartRestSerializer, SmartRestSetSupportedOperations},
+};
 use c8y_translator::json;
 use mqtt_channel::{Message, Topic};
 use std::collections::hash_map::Entry;
@@ -14,10 +16,8 @@ use std::path::Path;
 use thin_edge_json::alarm::ThinEdgeAlarm;
 use tracing::info;
 
-const C8Y_CLOUD: &str = "c8y";
-const INVENTORY_FRAGMENTS_FILE_LOCATION: &str = "/etc/tedge/device/inventory.json";
-const INVENTORY_MANAGED_OBJECTS_TOPIC: &str = "c8y/inventory/managedObjects/update";
-const SUPPORTED_OPERATIONS_DIRECTORY: &str = "/etc/tedge/operations";
+use super::{http_proxy::C8YHttpProxy, mapper::CumulocitySoftwareManagementMapper};
+
 const SMARTREST_PUBLISH_TOPIC: &str = "c8y/s/us";
 const TEDGE_ALARMS_TOPIC: &str = "tedge/alarms/";
 const INTERNAL_ALARMS_TOPIC: &str = "c8y-internal/alarms/";
@@ -27,22 +27,26 @@ pub struct CumulocityConverter {
     pub(crate) size_threshold: SizeThreshold,
     children: HashSet<String>,
     pub(crate) mapper_config: MapperConfig,
-    device_name: String,
-    device_type: String,
-
-    alarm_converter: AlarmConverter,
+    http_proxy: C8YHttpProxy,
 }
 
 impl CumulocityConverter {
-    pub fn new(size_threshold: SizeThreshold, device_name: String, device_type: String) -> Self {
-        let topics = vec![
-            "tedge/measurements",
-            "tedge/measurements/+",
-            "tedge/alarms/+/+",
-            "c8y-internal/alarms/+/+",
-        ]
-        .try_into()
-        .expect("topics that mapper should subscribe to");
+    pub fn new(
+        size_threshold: SizeThreshold,
+        operations: &Operations,
+        http_proxy: C8YHttpProxy,
+    ) -> Self {
+        let mut topic_fiter = make_valid_topic_filter_or_panic("tedge/measurements");
+        let () = topic_fiter
+            .add("tedge/measurements/+")
+            .expect("invalid measurement topic filter");
+
+        let () = topic_fiter
+            .add("tedge/alarms/+/+")
+            .expect("invalid alarm topic filter");
+
+        let () = topic_fiter
+            .add_all(CumulocitySoftwareManagementMapper::subscriptions(operations).unwrap());
 
         let mapper_config = MapperConfig {
             in_topic_filter: topics,
@@ -419,7 +423,7 @@ mod test {
 
         // Test the second output messages doesn't contain SmartREST child device creation.
         let out_second_messages = converter.convert(&in_message);
-        assert_eq!(out_second_messages, vec![expected_c8y_json_message.clone()]);
+        assert_eq!(out_second_messages, vec![expected_c8y_json_message]);
     }
 
     #[test]
@@ -458,10 +462,7 @@ mod test {
         );
         assert_eq!(
             out_second_messages,
-            vec![
-                expected_smart_rest_message,
-                expected_c8y_json_message.clone()
-            ]
+            vec![expected_smart_rest_message, expected_c8y_json_message]
         );
     }
 

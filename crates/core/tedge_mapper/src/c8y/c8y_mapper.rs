@@ -1,12 +1,18 @@
-use crate::c8y_converter::CumulocityConverter;
-use crate::component::TEdgeComponent;
-use crate::mapper::*;
-use crate::size_threshold::SizeThreshold;
+use crate::{
+    c8y::c8y_converter::CumulocityConverter,
+    mapper::{
+        component::TEdgeComponent, mapper::create_mapper, operations::Operations,
+        size_threshold::SizeThreshold,
+    },
+};
+
 use async_trait::async_trait;
 use tedge_config::{
     ConfigSettingAccessor, DeviceIdSetting, DeviceTypeSetting, MqttPortSetting, TEdgeConfig,
 };
 use tracing::{info_span, Instrument};
+
+use super::http_proxy::JwtAuthHttpProxy;
 
 const CUMULOCITY_MAPPER_NAME: &str = "tedge-mapper-c8y";
 
@@ -23,9 +29,14 @@ impl TEdgeComponent for CumulocityMapper {
     async fn start(&self, tedge_config: TEdgeConfig) -> Result<(), anyhow::Error> {
         let size_threshold = SizeThreshold(16 * 1024);
 
-        let device_name = tedge_config.query(DeviceIdSetting)?;
-        let device_type = tedge_config.query(DeviceTypeSetting)?;
-        let mqtt_port = tedge_config.query(MqttPortSetting)?.into();
+        let operations = Operations::try_new("/etc/tedge/operations", "c8y")?;
+        let http_proxy = JwtAuthHttpProxy::try_new(&tedge_config).await?;
+
+        let converter = Box::new(CumulocityConverter::new(
+            size_threshold,
+            &operations,
+            &http_proxy,
+        ));
 
         let converter = Box::new(CumulocityConverter::new(
             size_threshold,

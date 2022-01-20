@@ -1,6 +1,5 @@
-use crate::converter::*;
-use crate::error::*;
-use crate::size_threshold::SizeThreshold;
+use crate::mapper::{converter::*, error::*, size_threshold::SizeThreshold};
+
 use clock::Clock;
 use mqtt_channel::Message;
 use thin_edge_json::serialize::ThinEdgeJsonSerializer;
@@ -49,12 +48,20 @@ impl Converter for AzureConverter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::size_threshold::SizeThresholdExceeded;
+    use crate::{
+        az::converter::AzureConverter,
+        mapper::{
+            converter::*,
+            error::ConversionError,
+            size_threshold::{SizeThreshold, SizeThresholdExceeded},
+        },
+    };
+
     use assert_json_diff::*;
     use assert_matches::*;
     use chrono::{FixedOffset, TimeZone};
-    use mqtt_channel::Topic;
+    use clock::Clock;
+    use mqtt_channel::{Message, Topic};
     use serde_json::json;
 
     struct TestClock;

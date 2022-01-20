@@ -1,28 +1,21 @@
 use std::fmt;
 
-use crate::sm_c8y_mapper::mapper::CumulocitySoftwareManagementMapper;
 use crate::{
-    az_mapper::AzureMapper, c8y_mapper::CumulocityMapper, collectd_mapper::mapper::CollectdMapper,
-    component::TEdgeComponent, error::*,
+    az::mapper::AzureMapper,
+    c8y::{c8y_mapper::CumulocityMapper, mapper::CumulocitySoftwareManagementMapper},
+    mapper::{component::TEdgeComponent, error::MapperError},
 };
+
+use collectd::mapper::CollectdMapper;
 use flockfile::check_another_instance_is_not_running;
 use structopt::*;
 use tedge_config::*;
 use tedge_utils::paths::home_dir;
 
-mod az_converter;
-mod az_mapper;
-mod c8y_converter;
-mod c8y_fragments;
-mod c8y_mapper;
-mod collectd_mapper;
-mod component;
-mod converter;
-mod error;
+mod az;
+mod c8y;
+mod collectd;
 mod mapper;
-mod operations;
-mod size_threshold;
-mod sm_c8y_mapper;
 
 #[cfg(test)]
 mod tests;
@@ -75,10 +68,10 @@ pub enum MapperName {
 impl fmt::Display for MapperName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            MapperName::Az => write!(f, "{}", "tedge-mapper-az"),
-            MapperName::C8y => write!(f, "{}", "tedge-mapper-c8y"),
-            MapperName::Collectd => write!(f, "{}", "tedge-mapper-collectd"),
-            MapperName::SmC8y => write!(f, "{}", "sm-c8y-mapper"),
+            MapperName::Az => write!(f, "tedge-mapper-az"),
+            MapperName::C8y => write!(f, "tedge-mapper-c8y"),
+            MapperName::Collectd => write!(f, "tedge-mapper-collectd"),
+            MapperName::SmC8y => write!(f, "sm-c8y-mapper"),
         }
     }
 }

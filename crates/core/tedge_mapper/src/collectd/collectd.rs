@@ -214,7 +214,7 @@ mod tests {
         assert_eq!(metric_key, "value");
         assert_eq!(
             *timestamp,
-            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 09, 0)
+            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 9, 0)
         );
         assert_eq!(*metric_value, 32.5);
     }
@@ -237,7 +237,7 @@ mod tests {
         assert_eq!(metric_key, "value_val1");
         assert_eq!(
             *timestamp,
-            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 09, 0)
+            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 9, 0)
         );
 
         let CollectdMessage {
@@ -251,7 +251,7 @@ mod tests {
         assert_eq!(metric_key, "value_val2");
         assert_eq!(
             *timestamp,
-            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 09, 0)
+            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 9, 0)
         );
         assert_eq!(*metric_value, 45.2);
     }
@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(metric_key, "value");
         assert_eq!(
             *timestamp,
-            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 09, 125)
+            Utc.ymd(1973, 11, 29).and_hms_milli(21, 33, 9, 125)
         );
         assert_eq!(*metric_value, 32.5);
     }

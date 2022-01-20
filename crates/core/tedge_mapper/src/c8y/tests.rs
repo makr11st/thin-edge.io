@@ -1,9 +1,13 @@
-use crate::sm_c8y_mapper::http_proxy::{C8YHttpProxy, JwtAuthHttpProxy};
-use crate::sm_c8y_mapper::json_c8y::C8yUpdateSoftwareListResponse;
-use crate::sm_c8y_mapper::mapper::{
-    CumulocitySoftwareManagement, CumulocitySoftwareManagementMapper,
+use crate::{
+    c8y::{
+        error::SMCumulocityMapperError,
+        http_proxy::{C8YHttpProxy, JwtAuthHttpProxy},
+        json_c8y::C8yUpdateSoftwareListResponse,
+        mapper::{CumulocitySoftwareManagement, CumulocitySoftwareManagementMapper},
+    },
+    mapper::operations::Operations,
 };
-use crate::{operations::Operations, sm_c8y_mapper::error::SMCumulocityMapperError};
+
 use c8y_smartrest::smartrest_deserializer::SmartRestJwtResponse;
 use mqtt_channel::{Connection, TopicFilter};
 use mqtt_tests::test_mqtt_server::MqttProcessHandler;
@@ -75,7 +79,7 @@ async fn mapper_publishes_software_update_request() {
     // Prepare and publish a software update smartrest request on `c8y/s/ds`.
     let smartrest = r#"528,external_id,nodered,1.0.0::debian,,install"#;
     let _ = broker.publish("c8y/s/ds", smartrest).await.unwrap();
-    let _ = publish_a_fake_jwt_token(&broker).await;
+    let _ = publish_a_fake_jwt_token(broker).await;
 
     let expected_update_list = r#"
          "updateList": [
@@ -113,7 +117,7 @@ async fn mapper_publishes_software_update_status_onto_c8y_topic() {
 
     // Start SM Mapper
     let sm_mapper = start_sm_mapper(broker.port).await;
-    let _ = publish_a_fake_jwt_token(&broker).await;
+    let _ = publish_a_fake_jwt_token(broker).await;
 
     mqtt_tests::assert_received(
         &mut messages,
@@ -175,7 +179,7 @@ async fn mapper_publishes_software_update_failed_status_onto_c8y_topic() {
 
     // Start SM Mapper
     let sm_mapper = start_sm_mapper(broker.port).await;
-    let _ = publish_a_fake_jwt_token(&broker).await;
+    let _ = publish_a_fake_jwt_token(broker).await;
     mqtt_tests::assert_received(
         &mut messages,
         TEST_TIMEOUT_MS,
@@ -256,7 +260,7 @@ async fn mapper_fails_during_sw_update_recovers_and_process_response() -> Result
     // Prepare and publish a software update smartrest request on `c8y/s/ds`.
     let smartrest = r#"528,external_id,nodered,1.0.0::debian,,install"#;
     let _ = broker.publish("c8y/s/ds", smartrest).await.unwrap();
-    let _ = publish_a_fake_jwt_token(&broker).await;
+    let _ = publish_a_fake_jwt_token(broker).await;
 
     let expected_update_list = r#"
          "updateList": [
