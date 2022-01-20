@@ -29,6 +29,8 @@ use super::c8y_converter::CumulocityConverter;
 
 use super::c8y_converter::CumulocityConverter;
 
+use super::c8y_converter::CumulocityConverter;
+
 const AGENT_LOG_DIR: &str = "/var/log/tedge/agent";
 const SM_MAPPER: &str = "SM-C8Y-Mapper";
 
