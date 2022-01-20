@@ -64,7 +64,6 @@ impl CumulocityConverter {
         let () = topic_fiter
             .add("tedge/measurements/+")
             .expect("invalid measurement topic filter");
-
         let () = topic_fiter
             .add("tedge/alarms/+/+")
             .expect("invalid alarm topic filter");
