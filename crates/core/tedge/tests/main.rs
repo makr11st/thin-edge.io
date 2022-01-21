@@ -2,7 +2,8 @@ mod os_related;
 
 mod tests {
     use predicates::prelude::*;
-    use std::path::Path; // Used for writing assertions
+    use std::{borrow::Borrow, path::Path};
+    use test_case::test_case; // Used for writing assertions
 
     fn tedge_command<I, S>(args: I) -> Result<assert_cmd::Command, Box<dyn std::error::Error>>
     where
@@ -15,6 +16,23 @@ mod tests {
         Ok(cmd)
     }
 
+    /// executes a `cmd` with `args`
+    /// returns the stdout, stderr and exit code
+    // fn run_cmd(cmd: &str, args: &str) -> anyhow::Result<(String, String, i32)> {
+    //     let args = args.split_whitespace().collect::<Vec<&str>>();
+    //     let output = Command::new(cmd)
+    //         .args(args)
+    //         .stdin(Stdio::null())
+    //         .stdout(Stdio::piped())
+    //         .stderr(Stdio::piped())
+    //         .output()?;
+
+    //     let stdout = String::from_utf8(output.stdout).unwrap();
+    //     let stderr = String::from_utf8(output.stderr).unwrap();
+    //     let status_code = output.status.code().unwrap();
+    //     Ok((stdout, stderr, status_code))
+    // }
+
     #[test]
     fn run_help() -> Result<(), Box<dyn std::error::Error>> {
         let mut cmd = tedge_command(&["--help"])?;
@@ -22,6 +40,25 @@ mod tests {
         cmd.assert()
             .success()
             .stdout(predicate::str::contains("USAGE"));
+
+        Ok(())
+    }
+
+    #[test_case("tedge", &["--help"], &["USAGE", "FLAGS", "SUBCOMMANDS"])]
+    #[test_case("tedge", &["config", "--help"], &["USAGE", "FLAGS", "SUBCOMMANDS"])]
+    // #[test_case("tedge", &["--version"], &["tedge"])]
+    fn run_help2(
+        command: &str,
+        args: &[&str],
+        patterns: &[&str],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut cmd = assert_cmd::Command::cargo_bin(command)?;
+        cmd.args(args);
+
+        let mut assert = cmd.assert().success();
+        for each in patterns {
+            assert = assert.stdout(predicate::str::contains(each.to_owned()));
+        }
 
         Ok(())
     }
