@@ -1,4 +1,4 @@
-use crate::mapper::error::OperationsError;
+use crate::mapping::error::OperationsError;
 
 use std::{
     collections::{HashMap, HashSet},

@@ -1,4 +1,4 @@
-use crate::mapper::{converter::*, error::*, size_threshold::SizeThreshold};
+use crate::mapping::{converter::*, error::*, size_threshold::SizeThreshold};
 
 use clock::Clock;
 use mqtt_channel::Message;
@@ -50,7 +50,7 @@ impl Converter for AzureConverter {
 mod tests {
     use crate::{
         az::converter::AzureConverter,
-        mapper::{
+        mapping::{
             converter::*,
             error::ConversionError,
             size_threshold::{SizeThreshold, SizeThresholdExceeded},

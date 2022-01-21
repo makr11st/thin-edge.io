@@ -1,6 +1,6 @@
 use crate::{
-    c8y::c8y_converter::CumulocityConverter,
-    mapper::{
+    c8y::{c8y_converter::CumulocityConverter, http_proxy::JwtAuthHttpProxy},
+    mapping::{
         component::TEdgeComponent, mapper::create_mapper, operations::Operations,
         size_threshold::SizeThreshold,
     },
@@ -11,8 +11,6 @@ use tedge_config::{
     ConfigSettingAccessor, DeviceIdSetting, DeviceTypeSetting, MqttPortSetting, TEdgeConfig,
 };
 use tracing::{info_span, Instrument};
-
-use super::http_proxy::JwtAuthHttpProxy;
 
 const CUMULOCITY_MAPPER_NAME: &str = "tedge-mapper-c8y";
 

@@ -213,6 +213,15 @@ impl Converter for CumulocityConverter {
                 )),
             },
         }
+        // if message.topic.name.starts_with("tedge/measurement") {
+        //     self.try_convert_measurement(message)
+        // } else if message.topic.name.starts_with("tedge/alarms") {
+        //     self.try_convert_alarm(message)
+        // } else {
+        //     Err(ConversionError::UnsupportedTopic(
+        //         message.topic.name.clone(),
+        //     ))
+        // }
     }
 
     fn try_init_messages(&self) -> Result<Vec<Message>, ConversionError> {
@@ -537,7 +546,27 @@ fn create_device_data_fragments(
     Ok(Message::new(&topic, ops_msg.to_string()))
 }
 
-fn create_supported_operations_fragments() -> Result<Message, ConversionError> {
+fn create_get_software_list_message() -> Result<Message, ConversionError> {
+    let request = SoftwareListRequest::new();
+    let topic = Topic::new(RequestTopic::SoftwareListRequest.as_str())?;
+    let payload = request.to_json().unwrap();
+    Ok(Message::new(&topic, payload))
+}
+
+fn create_get_pending_operations_message() -> Result<Message, ConversionError> {
+    let data = SmartRestGetPendingOperations::default();
+    let topic = C8yTopic::SmartRestResponse.to_topic()?;
+    let payload = data.to_smartrest()?;
+    Ok(Message::new(&topic, payload))
+}
+
+fn create_supported_log_types_message() -> Result<Message, ConversionError> {
+    let payload = SmartRestSetSupportedLogType::default().to_smartrest()?;
+    let topic = C8yTopic::SmartRestResponse.to_topic()?;
+    Ok(Message::new(&topic, payload))
+}
+
+fn create_supported_operations_fragments_message() -> Result<Message, ConversionError> {
     let ops = Operations::try_new(SUPPORTED_OPERATIONS_DIRECTORY, C8Y_CLOUD)?;
     let ops = ops.get_operations_list();
     let ops = ops.iter().map(|op| op as &str).collect::<Vec<&str>>();

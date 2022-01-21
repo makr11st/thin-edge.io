@@ -1,4 +1,4 @@
-use crate::mapper::size_threshold::SizeThresholdExceeded;
+use crate::mapping::size_threshold::SizeThresholdExceeded;
 
 use mqtt_channel::MqttError;
 use std::path::PathBuf;

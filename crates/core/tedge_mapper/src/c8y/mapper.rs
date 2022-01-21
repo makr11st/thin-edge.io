@@ -5,12 +5,7 @@ use crate::{
         json_c8y::C8yUpdateSoftwareListResponse,
         topic::*,
     },
-    mapper::{
-        component::TEdgeComponent,
-        mapper::{create_mapper, mqtt_config},
-        operations::Operations,
-        size_threshold::SizeThreshold,
-    },
+    mapping::{component::TEdgeComponent, mapper::mqtt_config, operations::Operations},
 };
 
 use agent_interface::topic::ResponseTopic;
@@ -184,9 +179,9 @@ where
         let () = self.http_proxy.init().await?;
 
         info!("Running");
-        let () = self.publish_supported_log_types().await?;
-        let () = self.publish_get_pending_operations().await?;
-        let () = self.ask_software_list().await?;
+        let () = self.publish_supported_log_types().await?; // moved
+        let () = self.publish_get_pending_operations().await?; // moved
+        let () = self.ask_software_list().await?; // moved
 
         while let Err(err) = self.subscribe_messages_runtime().await {
             if let SMCumulocityMapperError::FromSmartRestDeserializer(

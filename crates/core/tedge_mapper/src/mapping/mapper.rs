@@ -1,4 +1,4 @@
-use crate::mapper::{converter::*, error::*};
+use crate::mapping::{converter::*, error::*};
 
 use mqtt_channel::{
     Connection, Message, MqttError, SinkExt, StreamExt, TopicFilter, UnboundedReceiver,

@@ -3,10 +3,10 @@ use std::fmt;
 use crate::{
     az::mapper::AzureMapper,
     c8y::{c8y_mapper::CumulocityMapper, mapper::CumulocitySoftwareManagementMapper},
-    mapper::{component::TEdgeComponent, error::MapperError},
+    collectd::mapper::CollectdMapper,
+    mapping::{component::TEdgeComponent, error::MapperError},
 };
 
-use collectd::mapper::CollectdMapper;
 use flockfile::check_another_instance_is_not_running;
 use structopt::*;
 use tedge_config::*;
@@ -15,7 +15,7 @@ use tedge_utils::paths::home_dir;
 mod az;
 mod c8y;
 mod collectd;
-mod mapper;
+mod mapping;
 
 #[cfg(test)]
 mod tests;
@@ -43,7 +43,7 @@ pub struct MapperOpt {
     ///
     /// If off only reports ERROR, WARN, and INFO
     /// If on also reports DEBUG and TRACE
-    #[structopt(long)]
+    #[structopt(long, global = true)]
     pub debug: bool,
 
     /// Start the mapper with clean session off, subscribe to the topics, so that no messages are lost

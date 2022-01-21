@@ -1,6 +1,6 @@
 use crate::{
     collectd::monitor::{DeviceMonitor, DeviceMonitorConfig},
-    mapper::component::TEdgeComponent,
+    mapping::component::TEdgeComponent,
 };
 
 use async_trait::async_trait;

@@ -1,6 +1,6 @@
 use crate::{
     az::converter::AzureConverter,
-    mapper::{component::TEdgeComponent, mapper::create_mapper, size_threshold::SizeThreshold},
+    mapping::{component::TEdgeComponent, mapper::create_mapper, size_threshold::SizeThreshold},
 };
 
 use async_trait::async_trait;
