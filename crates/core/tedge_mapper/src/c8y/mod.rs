@@ -1,11 +1,10 @@
-mod c8y_converter;
-pub mod c8y_mapper;
+mod converter;
 pub mod error;
 mod fragments;
 mod http_proxy;
 mod json_c8y;
 pub mod mapper;
-mod operations;
+pub mod sm_mapper;
 pub mod topic;
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use crate::c8y::{
     json_c8y::{
         C8yCreateEvent, C8yManagedObject, C8yUpdateSoftwareListResponse, InternalIdResponse,
     },
+    sm_mapper::SmartRestLogEvent,
 };
 
 use async_trait::async_trait;
@@ -23,7 +24,7 @@ const RETRY_TIMEOUT_SECS: u64 = 60;
 
 /// An HttpProxy handles http requests to C8y on behalf of the device.
 #[async_trait]
-pub trait C8YHttpProxy {
+pub trait C8YHttpProxy: Send + Sync {
     async fn init(&mut self) -> Result<(), SMCumulocityMapperError>;
 
     fn url_is_in_my_tenant_domain(&self, url: &str) -> bool;

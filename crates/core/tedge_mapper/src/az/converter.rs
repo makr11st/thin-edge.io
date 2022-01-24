@@ -1,5 +1,6 @@
 use crate::mapping::{converter::*, error::*, size_threshold::SizeThreshold};
 
+use async_trait::async_trait;
 use clock::Clock;
 use mqtt_channel::Message;
 use thin_edge_json::serialize::ThinEdgeJsonSerializer;
@@ -27,6 +28,7 @@ impl AzureConverter {
     }
 }
 
+#[async_trait]
 impl Converter for AzureConverter {
     type Error = ConversionError;
 
@@ -34,7 +36,7 @@ impl Converter for AzureConverter {
         &self.mapper_config
     }
 
-    fn try_convert(&mut self, input: &Message) -> Result<Vec<Message>, Self::Error> {
+    async fn try_convert(&mut self, input: &Message) -> Result<Vec<Message>, Self::Error> {
         let input = input.payload_str()?;
         let () = self.size_threshold.validate(input)?;
         let default_timestamp = self.add_timestamp.then(|| self.clock.now());

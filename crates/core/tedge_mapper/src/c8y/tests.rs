@@ -1,6 +1,11 @@
 use crate::{
-    c8y::http_proxy::{C8YHttpProxy, JwtAuthHttpProxy},
-    mapping::{mapper::create_mapper, operations::Operations, size_threshold::SizeThreshold},
+    c8y::{
+        error::SMCumulocityMapperError,
+        http_proxy::{C8YHttpProxy, JwtAuthHttpProxy},
+        json_c8y::C8yUpdateSoftwareListResponse,
+        sm_mapper::{CumulocitySoftwareManagement, CumulocitySoftwareManagementMapper},
+    },
+    mapping::operations::Operations,
 };
 
 use c8y_smartrest::smartrest_deserializer::SmartRestJwtResponse;

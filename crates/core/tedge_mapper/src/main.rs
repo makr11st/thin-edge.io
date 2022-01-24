@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{
     az::mapper::AzureMapper,
-    c8y::{c8y_mapper::CumulocityMapper, mapper::CumulocitySoftwareManagementMapper},
+    c8y::{mapper::CumulocityMapper, sm_mapper::CumulocitySoftwareManagementMapper},
     collectd::mapper::CollectdMapper,
     mapping::{component::TEdgeComponent, error::MapperError},
 };
@@ -25,7 +25,6 @@ fn lookup_component(component_name: &MapperName) -> Box<dyn TEdgeComponent> {
         MapperName::Az => Box::new(AzureMapper::new()),
         MapperName::Collectd => Box::new(CollectdMapper::new()),
         MapperName::C8y => Box::new(CumulocityMapper::new()),
-        MapperName::SmC8y => Box::new(CumulocitySoftwareManagementMapper::new()),
     }
 }
 
@@ -62,7 +61,6 @@ pub enum MapperName {
     Az,
     C8y,
     Collectd,
-    SmC8y,
 }
 
 impl fmt::Display for MapperName {
@@ -71,7 +69,6 @@ impl fmt::Display for MapperName {
             MapperName::Az => write!(f, "tedge-mapper-az"),
             MapperName::C8y => write!(f, "tedge-mapper-c8y"),
             MapperName::Collectd => write!(f, "tedge-mapper-collectd"),
-            MapperName::SmC8y => write!(f, "sm-c8y-mapper"),
         }
     }
 }

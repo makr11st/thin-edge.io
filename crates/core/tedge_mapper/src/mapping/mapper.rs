@@ -86,7 +86,7 @@ impl Mapper {
         }
 
         while let Some(message) = &mut self.input.next().await {
-            let converted_messages = self.converter.convert(message);
+            let converted_messages = self.converter.convert(message).await;
             for converted_message in converted_messages.into_iter() {
                 let _ = self.output.send(converted_message).await;
             }
@@ -118,6 +118,7 @@ impl Mapper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use mqtt_channel::{Message, Topic, TopicFilter};
     use std::time::Duration;
     use tokio::time::sleep;
@@ -190,6 +191,7 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl Converter for UppercaseConverter {
         type Error = ConversionError;
 
@@ -197,7 +199,7 @@ mod tests {
             &self.mapper_config
         }
 
-        fn try_convert(&mut self, input: &Message) -> Result<Vec<Message>, Self::Error> {
+        async fn try_convert(&mut self, input: &Message) -> Result<Vec<Message>, Self::Error> {
             let input = input.payload_str().expect("utf8");
             if input.is_ascii() {
                 let msg = vec![Message::new(
