@@ -71,20 +71,20 @@ where
         operations: Operations,
         http_proxy: Proxy,
     ) -> Self {
-        let mut topic_fiter = make_valid_topic_filter_or_panic("tedge/measurements");
-        let () = topic_fiter
+        let mut topic_filter = make_valid_topic_filter_or_panic("tedge/measurements");
+        let () = topic_filter
             .add("tedge/measurements/+")
             .expect("invalid measurement topic filter");
 
-        let () = topic_fiter
+        let () = topic_filter
             .add("tedge/alarms/+/+")
             .expect("invalid alarm topic filter");
 
-        let () = topic_fiter
+        let () = topic_filter
             .add_all(CumulocitySoftwareManagementMapper::subscriptions(&operations).unwrap());
 
         let mapper_config = MapperConfig {
-            in_topic_filter: topics,
+            in_topic_filter: topic_filter,
             out_topic: make_valid_topic_or_panic("c8y/measurement/measurements/create"),
             errors_topic: make_valid_topic_or_panic("tedge/errors"),
         };
@@ -623,7 +623,7 @@ async fn forward_software_request(
         .from_smartrest(smartrest)?
         .to_thin_edge_json()?;
 
-    let token = http_proxy.get_jwt_token().await?;
+    // let token = http_proxy.get_jwt_token().await?;
 
     software_update_request
         .update_list
