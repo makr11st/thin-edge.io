@@ -586,7 +586,7 @@ fn create_supported_operations_fragments_message() -> Result<Message, Conversion
 fn create_inventory_fragments_message(device_name: &str) -> Result<Message, ConversionError> {
     let ops_msg = get_inventory_fragments(INVENTORY_FRAGMENTS_FILE_LOCATION)?;
 
-    let topic = Topic::new_unchecked(&format!("{INVENTORY_MANAGED_OBJECTS_TOPIC}/{device_name}",));
+    let topic = Topic::new_unchecked(&format!("{INVENTORY_MANAGED_OBJECTS_TOPIC}/{device_name}"));
     Ok(Message::new(&topic, ops_msg.to_string()))
 }
 
@@ -598,7 +598,7 @@ async fn process_smartrest(
     match message_id {
         "528" => forward_software_request(payload).await,
         // "522" => forward_log_request(payload).await,
-        "510" => forward_restart_request(payload).await,
+        "510" => forward_restart_request(payload),
         template => match operations.matching_smartrest_template(template) {
             Some(operation) => {
                 if let Some(command) = operation.command() {
@@ -623,7 +623,7 @@ async fn forward_software_request(
         .from_smartrest(smartrest)?
         .to_thin_edge_json()?;
 
-    // let token = http_proxy.get_jwt_token().await?;
+    let token = http_proxy.get_jwt_token().await?;
 
     software_update_request
         .update_list
@@ -648,7 +648,7 @@ async fn forward_software_request(
     )])
 }
 
-async fn forward_restart_request(smartrest: &str) -> Result<Vec<Message>, SMCumulocityMapperError> {
+fn forward_restart_request(smartrest: &str) -> Result<Vec<Message>, SMCumulocityMapperError> {
     let topic = Topic::new(RequestTopic::RestartRequest.as_str())?;
     let _ = SmartRestRestartRequest::from_smartrest(smartrest)?;
 
