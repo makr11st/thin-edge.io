@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{
     az::mapper::AzureMapper,
-    c8y::{mapper::CumulocityMapper, sm_mapper::CumulocitySoftwareManagementMapper},
+    c8y::mapper::CumulocityMapper,
     collectd::mapper::CollectdMapper,
     mapping::{component::TEdgeComponent, error::MapperError},
 };

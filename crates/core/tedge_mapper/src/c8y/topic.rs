@@ -19,7 +19,7 @@ impl C8yTopic {
     }
 
     pub fn to_topic(&self) -> Result<Topic, MqttError> {
-        Ok(Topic::new(self.as_str())?)
+        Topic::new(self.as_str())
     }
 }
 

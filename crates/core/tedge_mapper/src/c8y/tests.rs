@@ -1,14 +1,11 @@
 use crate::{
     c8y::{
-        error::SMCumulocityMapperError,
         http_proxy::{C8YHttpProxy, JwtAuthHttpProxy},
-        json_c8y::C8yUpdateSoftwareListResponse,
         sm_mapper::{CumulocitySoftwareManagement, CumulocitySoftwareManagementMapper},
     },
     mapping::operations::Operations,
 };
 
-use c8y_smartrest::smartrest_deserializer::SmartRestJwtResponse;
 use mqtt_channel::{Connection, TopicFilter};
 use mqtt_tests::test_mqtt_server::MqttProcessHandler;
 use mqtt_tests::with_timeout::{Maybe, WithTimeout};
@@ -17,9 +14,9 @@ use serial_test::serial;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
-use super::{converter::CumulocityConverter, http_proxy::FakeC8YHttpProxy};
+use super::http_proxy::FakeC8YHttpProxy;
 
-const TEST_TIMEOUT_MS: Duration = Duration::from_millis(5000);
+const TEST_TIMEOUT_MS: Duration = Duration::from_millis(1000);
 
 #[tokio::test]
 #[serial]
@@ -513,35 +510,4 @@ async fn start_sm_mapper(mqtt_port: u16) -> Result<JoinHandle<()>, anyhow::Error
 
 async fn publish_a_fake_jwt_token(broker: &MqttProcessHandler) {
     let _ = broker.publish("c8y/s/dat", "71,1111").await.unwrap();
-}
-
-struct FakeC8YHttpProxy {}
-
-#[async_trait::async_trait]
-impl C8YHttpProxy for FakeC8YHttpProxy {
-    async fn init(&mut self) -> Result<(), SMCumulocityMapperError> {
-        Ok(())
-    }
-
-    fn url_is_in_my_tenant_domain(&self, _url: &str) -> bool {
-        true
-    }
-
-    async fn get_jwt_token(&mut self) -> Result<SmartRestJwtResponse, SMCumulocityMapperError> {
-        Ok(SmartRestJwtResponse::try_new("71,fake-token")?)
-    }
-
-    async fn send_software_list_http(
-        &mut self,
-        _c8y_software_list: &C8yUpdateSoftwareListResponse,
-    ) -> Result<(), SMCumulocityMapperError> {
-        Ok(())
-    }
-
-    async fn upload_log_binary(
-        &mut self,
-        _log_content: &str,
-    ) -> Result<String, SMCumulocityMapperError> {
-        Ok("fake/upload/url".into())
-    }
 }

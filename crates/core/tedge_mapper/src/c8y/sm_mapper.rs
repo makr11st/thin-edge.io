@@ -594,7 +594,7 @@ fn read_tedge_logs(
 
 #[cfg(test)]
 mod tests {
-    use sm_mapper::*;
+    use super::*;
     use std::fs::File;
     use std::io::Write;
     use std::str::FromStr;

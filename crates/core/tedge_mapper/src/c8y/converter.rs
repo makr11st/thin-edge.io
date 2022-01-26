@@ -9,7 +9,6 @@ use agent_interface::{
 use async_trait::async_trait;
 use c8y_smartrest::{
     alarm,
-    error::SmartRestDeserializerError,
     smartrest_deserializer::{SmartRestRestartRequest, SmartRestUpdateSoftware},
     smartrest_serializer::{
         CumulocitySupportedOperations, SmartRestGetPendingOperations, SmartRestSerializer,
@@ -19,23 +18,16 @@ use c8y_smartrest::{
     },
 };
 use c8y_translator::json;
-use mqtt_channel::{Message, Topic, TopicFilter};
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    fs::File,
-    io::Read,
-    path::Path,
-    process::Stdio,
-};
+use mqtt_channel::{Message, Topic};
+use std::{collections::HashSet, fs::File, io::Read, path::Path};
 use thin_edge_json::alarm::ThinEdgeAlarm;
 use tracing::{debug, info, log::error};
 
 use super::{
     error::SMCumulocityMapperError,
-    fragments::{C8yAgentFragment, C8yDeviceDataFragment},
+    fragments::C8yAgentFragment,
     http_proxy::C8YHttpProxy,
-    json_c8y::C8yUpdateSoftwareListResponse,
-    mapper::CumulocityMapper,
+    sm_mapper::{execute_operation, CumulocitySoftwareManagementMapper},
     topic::{C8yTopic, MapperSubscribeTopic},
 };
 
@@ -125,7 +117,7 @@ where
                     self.children.insert(child_id.clone());
                     vec.push(Message::new(
                         &Topic::new_unchecked(SMARTREST_PUBLISH_TOPIC),
-                        format!("101,{},{},thin-edge.io-child", child_id, child_id),
+                        format!("101,{child_id},{child_id},thin-edge.io-child"),
                     ));
                 }
 
@@ -708,7 +700,9 @@ fn get_child_id_from_topic(topic: &str) -> Result<Option<String>, ConversionErro
 
 #[cfg(test)]
 mod test {
-    use converter::*;
+    use crate::c8y::http_proxy::FakeC8YHttpProxy;
+
+    use super::*;
 
     use crate::c8y_converter::CumulocityConverter;
     use test_case::test_case;
@@ -729,16 +723,18 @@ mod test {
         }
     }
 
-    #[test]
-    fn convert_thin_edge_json_with_child_id() {
+    #[tokio::test]
+    async fn convert_thin_edge_json_with_child_id() {
         let device_name = String::from("test");
         let device_type = String::from("test_type");
 
         let mut converter = Box::new(CumulocityConverter::new(
             SizeThreshold(16 * 1024),
             device_name,
-            device_type,
+            operations,
+            http_proxy,
         ));
+
         let in_topic = "tedge/measurements/child1";
         let in_payload = r#"{"temp": 1, "time": "2021-11-16T17:45:40.571760714+01:00"}"#;
         let in_message = Message::new(&Topic::new_unchecked(in_topic), in_payload);
@@ -753,7 +749,7 @@ mod test {
         );
 
         // Test the first output messages contains SmartREST and C8Y JSON.
-        let out_first_messages = converter.convert(&in_message);
+        let out_first_messages = converter.convert(&in_message).await;
         assert_eq!(
             out_first_messages,
             vec![
@@ -763,20 +759,22 @@ mod test {
         );
 
         // Test the second output messages doesn't contain SmartREST child device creation.
-        let out_second_messages = converter.convert(&in_message);
+        let out_second_messages = converter.convert(&in_message).await;
         assert_eq!(out_second_messages, vec![expected_c8y_json_message]);
     }
 
-    #[test]
-    fn convert_first_thin_edge_json_invalid_then_valid_with_child_id() {
+    #[tokio::test]
+    async fn convert_first_thin_edge_json_invalid_then_valid_with_child_id() {
         let device_name = String::from("test");
-        let device_type = String::from("test_type");
+        let operations = Operations::new();
+        let http_proxy = FakeC8YHttpProxy {};
 
         let mut converter = Box::new(CumulocityConverter::new(
             SizeThreshold(16 * 1024),
             device_name,
             device_type,
         ));
+
         let in_topic = "tedge/measurements/child1";
         let in_invalid_payload = r#"{"temp": invalid}"#;
         let in_valid_payload = r#"{"temp": 1, "time": "2021-11-16T17:45:40.571760714+01:00"}"#;
@@ -784,7 +782,7 @@ mod test {
         let in_second_message = Message::new(&Topic::new_unchecked(in_topic), in_valid_payload);
 
         // First convert invalid Thin Edge JSON message.
-        let out_first_messages = converter.convert(&in_first_message);
+        let out_first_messages = converter.convert(&in_first_message).await;
         let expected_error_message = Message::new(
             &Topic::new_unchecked("tedge/errors"),
             r#"Invalid JSON: expected value at line 1 column 10: `invalid}`"#,
@@ -792,7 +790,7 @@ mod test {
         assert_eq!(out_first_messages, vec![expected_error_message]);
 
         // Second convert valid Thin Edge JSON message.
-        let out_second_messages = converter.convert(&in_second_message);
+        let out_second_messages = converter.convert(&in_second_message).await;
         let expected_smart_rest_message = Message::new(
             &Topic::new_unchecked("c8y/s/us"),
             "101,child1,child1,thin-edge.io-child",
@@ -807,8 +805,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn convert_two_thin_edge_json_messages_given_different_child_id() {
+    #[tokio::test]
+    async fn convert_two_thin_edge_json_messages_given_different_child_id() {
         let device_name = String::from("test");
         let device_type = String::from("test_type");
 
@@ -824,7 +822,7 @@ mod test {
             &Topic::new_unchecked("tedge/measurements/child1"),
             in_payload,
         );
-        let out_first_messages = converter.convert(&in_first_message);
+        let out_first_messages = converter.convert(&in_first_message).await;
         let expected_first_smart_rest_message = Message::new(
             &Topic::new_unchecked("c8y/s/us"),
             "101,child1,child1,thin-edge.io-child",
@@ -846,7 +844,7 @@ mod test {
             &Topic::new_unchecked("tedge/measurements/child2"),
             in_payload,
         );
-        let out_second_messages = converter.convert(&in_second_message);
+        let out_second_messages = converter.convert(&in_second_message).await;
         let expected_second_smart_rest_message = Message::new(
             &Topic::new_unchecked("c8y/s/us"),
             "101,child2,child2,thin-edge.io-child",
@@ -867,13 +865,11 @@ mod test {
     #[test]
     fn check_c8y_threshold_packet_size() -> Result<(), anyhow::Error> {
         let device_name = String::from("test");
-        let device_type = String::from("test_type");
+        let operations = Operations::new();
+        let http_proxy = FakeC8YHttpProxy {};
 
-        let converter = Box::new(CumulocityConverter::new(
-            SizeThreshold(16 * 1024),
-            device_name,
-            device_type,
-        ));
+        let converter =
+            CumulocityConverter::new(size_threshold, device_name, operations, http_proxy);
         let buffer = create_packet(1024 * 20);
         let err = converter.size_threshold.validate(&buffer).unwrap_err();
         assert_eq!(
