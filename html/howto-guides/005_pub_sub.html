@@ -153,6 +153,10 @@
 <p><code>tedge mqtt pub</code> supports setting of QoS for MQTT messages:</p>
 <pre><code class="language-shell">tedge mqtt pub 'tedge/measurements' '{ &quot;temperature&quot;: 21.3 }' --qos 2
 </code></pre>
+<p><code>tedge mqtt pub</code> supports publishing a MQTT message with retain flag:</p>
+<pre><code class="language-shell">tedge mqtt pub --retain --qos 1 tedge/alarms/critical/high_temperature '{&quot;message&quot;: &quot;Temperature is critical&quot;}'
+</code></pre>
+<p>Note: By default the mqtt message will be published with retain flag set to false.</p>
 <h2 id="subscribe"><a class="header" href="#subscribe">Subscribe</a></h2>
 <p>Command <a href="../references/tedge-mqtt.html"><code>tedge mqtt sub</code></a> can be used to ease debugging of of MQTT communication on local bridge. You can subscribe to topic of your choosing:</p>
 <pre><code class="language-shell">tedge mqtt sub tedge/errors
