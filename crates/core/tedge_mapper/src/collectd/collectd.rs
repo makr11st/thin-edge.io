@@ -230,7 +230,7 @@ mod tests {
             metric_group_key,
             metric_key,
             timestamp,
-            metric_value,
+            metric_value: _,
         } = collectd_message.index(0);
         assert_eq!(metric_group_key, "temperature");
 
