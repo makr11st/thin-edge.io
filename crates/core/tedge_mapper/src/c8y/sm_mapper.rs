@@ -28,7 +28,7 @@ use chrono::{DateTime, FixedOffset};
 use download::{Auth, DownloadInfo};
 use mqtt_channel::{Connection, MqttError, SinkExt, StreamExt, Topic, TopicFilter};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::Path;
 
 use std::{convert::TryInto, process::Stdio};
 use tedge_config::TEdgeConfig;
@@ -39,6 +39,7 @@ const AGENT_LOG_DIR: &str = "/var/log/tedge/agent";
 pub struct CumulocitySoftwareManagementMapper {}
 
 impl CumulocitySoftwareManagementMapper {
+    #[cfg(test)]
     pub fn new() -> Self {
         Self {}
     }
@@ -96,6 +97,7 @@ impl<Proxy> CumulocitySoftwareManagement<Proxy>
 where
     Proxy: C8YHttpProxy,
 {
+    #[cfg(test)]
     pub fn new(client: Connection, http_proxy: Proxy, operations: Operations) -> Self {
         Self {
             client,
@@ -354,7 +356,7 @@ where
 
     async fn forward_log_request(&mut self, payload: &str) -> Result<(), SMCumulocityMapperError> {
         // retrieve smartrest object from payload
-        let smartrest_obj = SmartRestLogRequest::from_smartrest(&payload)?;
+        let smartrest_obj = SmartRestLogRequest::from_smartrest(payload)?;
 
         // 1. set log file request to executing
         let () = self.set_log_file_request_executing().await?;
@@ -487,7 +489,7 @@ pub struct SmartRestLogEvent {
 /// let path_bufdate_time = get_datetime_from_file_path(&path_buf).unwrap();
 /// ```
 fn get_datetime_from_file_path(
-    log_path: &PathBuf,
+    log_path: &Path,
 ) -> Result<DateTime<FixedOffset>, SMCumulocityMapperError> {
     if let Some(stem_string) = log_path.file_stem().and_then(|s| s.to_str()) {
         // a typical file stem looks like this: software-list-2021-10-27T10:29:58Z.
@@ -538,7 +540,7 @@ fn read_tedge_logs(
         .filter_map(|r| r.ok())
         .filter_map(|dir_entry| {
             let file_path = &dir_entry.path();
-            let datetime_object = get_datetime_from_file_path(&file_path);
+            let datetime_object = get_datetime_from_file_path(file_path);
             match datetime_object {
                 Ok(dt) => {
                     if dt < smartrest_obj.date_from || dt > smartrest_obj.date_to {
@@ -595,9 +597,9 @@ fn read_tedge_logs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
     use std::io::Write;
     use std::str::FromStr;
+    use std::{fs::File, path::PathBuf};
     use test_case::test_case;
 
     #[test_case("/path/to/software-list-2021-10-27T10:44:44Z.log")]
