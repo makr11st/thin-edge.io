@@ -9,6 +9,7 @@ use agent_interface::{
 use async_trait::async_trait;
 use c8y_smartrest::{
     alarm,
+    error::SmartRestDeserializerError,
     smartrest_deserializer::{SmartRestRestartRequest, SmartRestUpdateSoftware},
     smartrest_serializer::{
         CumulocitySupportedOperations, SmartRestGetPendingOperations, SmartRestSerializer,
@@ -68,8 +69,6 @@ impl CumulocityConverter {
 
         let children: HashSet<String> = HashSet::new();
 
-        let alarm_converter = AlarmConverter::new();
-
         CumulocityConverter {
             size_threshold,
             children,
@@ -116,6 +115,17 @@ impl CumulocityConverter {
         }
         Ok(vec)
     }
+
+    fn try_convert_alarm(&self, input: &Message) -> Result<Vec<Message>, ConversionError> {
+        let c8y_alarm_topic = Topic::new_unchecked(SMARTREST_PUBLISH_TOPIC);
+        let mut vec: Vec<Message> = Vec::new();
+
+        let tedge_alarm = ThinEdgeAlarm::try_from(input.topic.name.as_str(), input.payload_str()?)?;
+        let smartrest_alarm = alarm::serialize_alarm(tedge_alarm)?;
+        vec.push(Message::new(&c8y_alarm_topic, smartrest_alarm));
+
+        Ok(vec)
+    }
 }
 
 impl Converter for CumulocityConverter {
@@ -124,9 +134,8 @@ impl Converter for CumulocityConverter {
     fn get_mapper_config(&self) -> &MapperConfig {
         &self.mapper_config
     }
-
-    fn try_convert(&mut self, input: &Message) -> Result<Vec<Message>, ConversionError> {
-        let () = self.size_threshold.validate(input.payload_str()?)?;
+    async fn try_convert(&mut self, message: &Message) -> Result<Vec<Message>, ConversionError> {
+        let () = self.size_threshold.validate(message.payload_str()?)?;
 
         match &message.topic {
             topic if topic.name.starts_with("tedge/measurements") => {
@@ -158,13 +167,37 @@ impl Converter for CumulocityConverter {
                 }
                 Ok(MapperSubscribeTopic::C8yTopic(_)) => {
                     debug!("Cumulocity");
-                    Ok(process_smartrest(
+                    match process_smartrest(
                         message.payload_str()?,
                         &self.operations,
                         &mut self.http_proxy,
                     )
                     .await
-                    .unwrap())
+                    {
+                        Err(
+                            ref err @ SMCumulocityMapperError::FromSmartRestDeserializer(
+                                SmartRestDeserializerError::InvalidParameter {
+                                    ref operation, ..
+                                },
+                            ),
+                        ) => {
+                            let topic = C8yTopic::SmartRestResponse.to_topic()?;
+                            let msg1 = Message::new(&topic, format!("501,{}", operation));
+                            let msg2 = Message::new(
+                                &topic,
+                                format!("502,{},\"{}\"", operation, &err.to_string()),
+                            );
+                            error!("{}", err);
+                            return Ok(vec![msg1, msg2]);
+                        }
+
+                        Err(err) => {
+                            error!("{}", err);
+                            Ok(vec![])
+                        }
+
+                        Ok(msgs) => Ok(msgs.to_owned()),
+                    }
                 }
                 _ => Err(ConversionError::UnsupportedTopic(
                     message.topic.name.clone(),

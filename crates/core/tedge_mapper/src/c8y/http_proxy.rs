@@ -335,6 +335,39 @@ impl C8YHttpProxy for JwtAuthHttpProxy {
 }
 
 #[cfg(test)]
+pub struct FakeC8YHttpProxy {}
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl C8YHttpProxy for FakeC8YHttpProxy {
+    async fn init(&mut self) -> Result<(), SMCumulocityMapperError> {
+        Ok(())
+    }
+
+    fn url_is_in_my_tenant_domain(&self, _url: &str) -> bool {
+        true
+    }
+
+    async fn get_jwt_token(&mut self) -> Result<SmartRestJwtResponse, SMCumulocityMapperError> {
+        Ok(SmartRestJwtResponse::try_new("71,fake-token")?)
+    }
+
+    async fn send_software_list_http(
+        &mut self,
+        _c8y_software_list: &C8yUpdateSoftwareListResponse,
+    ) -> Result<(), SMCumulocityMapperError> {
+        Ok(())
+    }
+
+    async fn upload_log_binary(
+        &mut self,
+        _log_content: &str,
+    ) -> Result<String, SMCumulocityMapperError> {
+        Ok("fake/upload/url".into())
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use test_case::test_case;
