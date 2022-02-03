@@ -287,6 +287,10 @@ Here, we use <code>tedge mqtt pub</code> a raw Cumulocity SmartRest message to b
 <p>To check that this message has been received by Cumulocity,
 navigate to &quot;Device Management/Devices/All devices/&lt;your device id&gt;/Measurements&quot;.
 You should observe a &quot;temperature measurement&quot; graph with the new data point.</p>
+<h2 id="configuring-custom-device-data"><a class="header" href="#configuring-custom-device-data">Configuring custom device data</a></h2>
+<p>You can configure the device data panel in the Cumulocity UI to display information specific to your device.
+To do so, create an <code>inventory.json</code> json file under <code>/etc/tedge/device</code>.
+<em>Note</em>: that you must ensure that this file can be read by the <code>tedge-mapper</code> user group.</p>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <p>You can now:</p>
 <ul>

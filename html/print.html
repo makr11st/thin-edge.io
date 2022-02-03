@@ -413,6 +413,10 @@ Here, we use <code>tedge mqtt pub</code> a raw Cumulocity SmartRest message to b
 <p>To check that this message has been received by Cumulocity,
 navigate to &quot;Device Management/Devices/All devices/&lt;your device id&gt;/Measurements&quot;.
 You should observe a &quot;temperature measurement&quot; graph with the new data point.</p>
+<h2 id="configuring-custom-device-data"><a class="header" href="#configuring-custom-device-data">Configuring custom device data</a></h2>
+<p>You can configure the device data panel in the Cumulocity UI to display information specific to your device.
+To do so, create an <code>inventory.json</code> json file under <code>/etc/tedge/device</code>.
+<em>Note</em>: that you must ensure that this file can be read by the <code>tedge-mapper</code> user group.</p>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <p>You can now:</p>
 <ul>
@@ -3486,7 +3490,7 @@ To get started you need Cargo's bin directory (<code>$HOME/.cargo/bin</code>) in
 </code></pre>
 <p>And then you can run <code>rustc</code> to view current version:</p>
 <pre><code class="language-shell">$ rustc --version
-rustc 1.58.0 (02072b482 2022-01-11)
+rustc 1.58.1 (db9d1b20b 2022-01-20)
 </code></pre>
 <blockquote>
 <p>Note: Above command will add rust to path only for existing session,
@@ -3499,7 +3503,7 @@ you simply need to add the line from above, <code>export PATH=$PATH:$HOME/.cargo
 eg. zsh uses ~/.zshrc. Check your shell's documentation to find what file it uses.</p>
 </blockquote>
 <p>thin-edge.io operates the <code>MSRV</code> (Minimum Supported Rust Version) and uses stable toolchain.</p>
-<p>Current MSRV is <code>1.58.0</code>.</p>
+<p>Current MSRV is <code>1.58.1</code>.</p>
 <h3 id="cross-compilation-toolchain-optional"><a class="header" href="#cross-compilation-toolchain-optional">Cross compilation toolchain (optional)</a></h3>
 <p>thin-edge.io can be compiled for target architecture on non-target device, this is called cross compilation.
 Currently we support <code>Raspberry Pi 3B</code> for <code>armv7</code> architecture with Rust's cross compilation toolchain called <a href="https://github.com/rust-embedded/cross">cargo cross</a>.</p>
