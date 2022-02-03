@@ -336,8 +336,10 @@ impl C8YHttpProxy for JwtAuthHttpProxy {
     }
 }
 
+#[cfg(test)]
 pub struct FakeC8YHttpProxy {}
 
+#[cfg(test)]
 #[async_trait::async_trait]
 impl C8YHttpProxy for FakeC8YHttpProxy {
     async fn init(&mut self) -> Result<(), SMCumulocityMapperError> {
