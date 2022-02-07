@@ -19,12 +19,14 @@ use c8y_smartrest::{
     },
 };
 use c8y_translator::json;
-use mqtt_channel::{Message, Topic};
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use mqtt_channel::{Message, Topic, TopicFilter};
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    fs::File,
+    io::Read,
+    path::Path,
+    process::Stdio,
+};
 use thin_edge_json::alarm::ThinEdgeAlarm;
 use tracing::{debug, info, log::error};
 
@@ -33,7 +35,7 @@ use super::{
     fragments::{C8yAgentFragment, C8yDeviceDataFragment},
     http_proxy::C8YHttpProxy,
     json_c8y::C8yUpdateSoftwareListResponse,
-    sm_mapper::{execute_operation, CumulocitySoftwareManagementMapper},
+    mapper::CumulocityMapper,
     topic::{C8yTopic, MapperSubscribeTopic},
 };
 
@@ -67,8 +69,7 @@ impl CumulocityConverter {
             .add("tedge/alarms/+/+")
             .expect("invalid alarm topic filter");
 
-        let () = topic_fiter
-            .add_all(CumulocitySoftwareManagementMapper::subscriptions(operations).unwrap());
+        let () = topic_filter.add_all(CumulocityMapper::subscriptions(&operations).unwrap());
 
         let mapper_config = MapperConfig {
             in_topic_filter: topics,
@@ -637,6 +638,26 @@ async fn validate_and_publish_software_list(
     }
 
     Ok(vec![])
+}
+
+async fn execute_operation(payload: &str, command: &str) -> Result<(), SMCumulocityMapperError> {
+    let command = command.to_owned();
+    let payload = payload.to_string();
+
+    let _handle = tokio::spawn(async move {
+        let mut child = tokio::process::Command::new(command)
+            .args(&[payload])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| SMCumulocityMapperError::ExecuteFailed(e.to_string()))
+            .unwrap();
+
+        child.wait().await
+    });
+
+    Ok(())
 }
 
 async fn process_smartrest(

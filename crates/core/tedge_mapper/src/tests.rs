@@ -39,7 +39,7 @@ async fn c8y_mapper_alarm_mapping_to_smartrest() {
     dbg!(&msg);
 
     // The first message could be SmartREST 114 for supported operations
-    if msg.contains("114") {
+    while !msg.contains("302") {
         // Fetch the next message which should be the alarm
         msg = messages
             .next()
@@ -94,7 +94,7 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     dbg!(&msg);
 
     // The first message could be SmartREST 114 for supported operations
-    if msg.contains("114") {
+    while !msg.contains("301") {
         // Fetch the next message which should be the alarm
         msg = messages
             .next()
@@ -143,7 +143,7 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     dbg!(&msg);
 
     // The first message could be SmartREST 114 for supported operations
-    if msg.contains("114") {
+    while !msg.contains("301") {
         // Fetch the next message which should be the alarm
         msg = messages
             .next()

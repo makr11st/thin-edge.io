@@ -3,7 +3,6 @@ use crate::c8y::{
     json_c8y::{
         C8yCreateEvent, C8yManagedObject, C8yUpdateSoftwareListResponse, InternalIdResponse,
     },
-    mapper::SmartRestLogEvent,
 };
 
 use async_trait::async_trait;
@@ -17,6 +16,8 @@ use tedge_config::{
     MqttPortSetting, TEdgeConfig,
 };
 use tracing::{error, info, instrument};
+
+use super::operations::SmartRestLogEvent;
 
 const RETRY_TIMEOUT_SECS: u64 = 60;
 
