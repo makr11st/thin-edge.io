@@ -40,6 +40,7 @@ pub struct CumulocitySoftwareManagementMapper {}
 
 impl CumulocitySoftwareManagementMapper {
     #[cfg(test)]
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {}
     }
@@ -62,17 +63,6 @@ impl CumulocitySoftwareManagementMapper {
 impl TEdgeComponent for CumulocitySoftwareManagementMapper {
     #[instrument(skip(self, tedge_config), name = "sm-c8y-mapper")]
     async fn start(&self, tedge_config: TEdgeConfig) -> Result<(), anyhow::Error> {
-        // let size_threshold = SizeThreshold(16 * 1024);
-
-        // let converter = Box::new(CumulocityConverter::new(size_threshold));
-
-        // let mut mapper2 = create_mapper(CUMULOCITY_MAPPER_NAME, &tedge_config, converter).await?;
-
-        // mapper2
-        //     .run()
-        //     .instrument(info_span!(CUMULOCITY_MAPPER_NAME))
-        //     .await?;
-
         let operations = Operations::try_new("/etc/tedge/operations", "c8y")?;
         let http_proxy = JwtAuthHttpProxy::try_new(&tedge_config).await?;
         let mut sm_mapper =

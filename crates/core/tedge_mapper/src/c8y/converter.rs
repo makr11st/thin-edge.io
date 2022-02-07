@@ -9,6 +9,7 @@ use agent_interface::{
 use async_trait::async_trait;
 use c8y_smartrest::{
     alarm,
+    error::SmartRestDeserializerError,
     smartrest_deserializer::{SmartRestRestartRequest, SmartRestUpdateSoftware},
     smartrest_serializer::{
         CumulocitySupportedOperations, SmartRestGetPendingOperations, SmartRestSerializer,
@@ -84,13 +85,6 @@ where
 
         let children: HashSet<String> = HashSet::new();
 
-        // CumulocityConverter {
-        //     size_threshold,
-        //     children,
-        //     mapper_config,
-        //     device_name,
-        //     // http_proxy: JwtAuthHttpProxy::new(),
-        // }
         CumulocityConverter {
             size_threshold,
             children,
@@ -148,16 +142,6 @@ where
 
         Ok(vec)
     }
-
-    // fn try_convert_operations(&self, input: &Message) -> Result<Vec<Message>, ConversionError> {
-    //     let mut vec: Vec<Message> = Vec::new();
-
-    //     let c8y_operations_topic = Topic::new_unchecked(SMARTREST_PUBLISH_TOPIC);
-    //     let smartrest_operations = SmartRestSerializer::serialize_operations(input.payload_str()?)?;
-    //     vec.push(Message::new(&c8y_operations_topic, smartrest_operations));
-
-    //     Ok(vec)
-    // }
 }
 
 #[async_trait]
@@ -203,13 +187,37 @@ where
                 }
                 Ok(MapperSubscribeTopic::C8yTopic(_)) => {
                     debug!("Cumulocity");
-                    Ok(process_smartrest(
+                    match process_smartrest(
                         message.payload_str()?,
                         &self.operations,
                         &mut self.http_proxy,
                     )
                     .await
-                    .unwrap())
+                    {
+                        Err(
+                            ref err @ SMCumulocityMapperError::FromSmartRestDeserializer(
+                                SmartRestDeserializerError::InvalidParameter {
+                                    ref operation, ..
+                                },
+                            ),
+                        ) => {
+                            let topic = C8yTopic::SmartRestResponse.to_topic()?;
+                            let msg1 = Message::new(&topic, format!("501,{}", operation));
+                            let msg2 = Message::new(
+                                &topic,
+                                format!("502,{},\"{}\"", operation, &err.to_string()),
+                            );
+                            error!("{}", err);
+                            return Ok(vec![msg1, msg2]);
+                        }
+
+                        Err(err) => {
+                            error!("{}", err);
+                            Ok(vec![])
+                        }
+
+                        Ok(msgs) => Ok(msgs.to_owned()),
+                    }
                 }
                 _ => Err(ConversionError::UnsupportedTopic(
                     message.topic.name.clone(),

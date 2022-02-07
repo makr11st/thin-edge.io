@@ -1,10 +1,10 @@
 use serde::Serialize;
 use std::process::Command;
 
-<<<<<<<< HEAD:crates/core/tedge_mapper/src/c8y_fragments.rs
 use crate::error::ConversionError;
 use tracing::warn;
 
+use crate::mapping::error::ConversionError;
 const DEFAULT_AGENT_FRAGMENT_NAME: &str = "thin-edge.io";
 const DEFAULT_AGENT_FRAGMENT_URL: &str = "https://thin-edge.io";
 
@@ -14,13 +14,6 @@ pub struct C8yAgent {
     version: String,
     url: String,
 }
-========
-use tracing::error;
-
-use crate::mapping::error::ConversionError;
-
-// rename to c8y_agent_fragment.rs
->>>>>>>> 668f5a7b3 (Some commit):crates/core/tedge_mapper/src/c8y/fragments.rs
 
 #[derive(Debug, Serialize)]
 pub struct C8yAgentFragment {

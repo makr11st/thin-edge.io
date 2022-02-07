@@ -26,8 +26,6 @@ pub enum SMCumulocityMapperError {
     #[error(transparent)]
     FromSmartRestDeserializer(#[from] SmartRestDeserializerError),
 
-    // #[error(transparent)]
-    // FromSoftwareError(#[from] SoftwareError),
     #[error(transparent)]
     FromTedgeConfig(#[from] tedge_config::ConfigSettingError),
 
