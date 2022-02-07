@@ -6,11 +6,14 @@ use crate::{
     },
 };
 
+use agent_interface::topic::ResponseTopic;
 use async_trait::async_trait;
 use tedge_config::{ConfigSettingAccessor, DeviceIdSetting, TEdgeConfig};
 use tracing::{info_span, Instrument};
 
 const CUMULOCITY_MAPPER_NAME: &str = "tedge-mapper-c8y";
+const AGENT_LOG_DIR: &str = "/var/log/tedge/agent";
+const SM_MAPPER: &str = "SM-C8Y-Mapper";
 
 pub struct CumulocityMapper {}
 

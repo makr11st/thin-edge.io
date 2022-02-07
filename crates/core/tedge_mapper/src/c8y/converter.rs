@@ -26,7 +26,7 @@ use tracing::{debug, info, log::error};
 
 use super::{
     error::SMCumulocityMapperError,
-    fragments::C8yAgentFragment,
+    fragments::{C8yAgentFragment, C8yDeviceDataFragment},
     http_proxy::C8YHttpProxy,
     json_c8y::C8yUpdateSoftwareListResponse,
     sm_mapper::{execute_operation, CumulocitySoftwareManagementMapper},
