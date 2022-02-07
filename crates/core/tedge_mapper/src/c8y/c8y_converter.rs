@@ -28,10 +28,19 @@ use std::path::Path;
 use thin_edge_json::alarm::ThinEdgeAlarm;
 use tracing::{debug, info, log::error};
 
+use super::{
+    error::SMCumulocityMapperError,
+    fragments::{C8yAgentFragment, C8yDeviceDataFragment},
+    http_proxy::C8YHttpProxy,
+    json_c8y::C8yUpdateSoftwareListResponse,
     sm_mapper::{execute_operation, CumulocitySoftwareManagementMapper},
     topic::{C8yTopic, MapperSubscribeTopic},
 };
 
+const C8Y_CLOUD: &str = "c8y";
+const INVENTORY_FRAGMENTS_FILE_LOCATION: &str = "/etc/tedge/device/inventory.json";
+const SUPPORTED_OPERATIONS_DIRECTORY: &str = "/etc/tedge/operations";
+const INVENTORY_MANAGED_OBJECTS_TOPIC: &str = "c8y/inventory/managedObjects/update";
 const SMARTREST_PUBLISH_TOPIC: &str = "c8y/s/us";
 const TEDGE_ALARMS_TOPIC: &str = "tedge/alarms/";
 const INTERNAL_ALARMS_TOPIC: &str = "c8y-internal/alarms/";
@@ -208,16 +217,20 @@ impl Converter for CumulocityConverter {
 
     fn try_init_messages(&self) -> Result<Vec<Message>, ConversionError> {
         let inventory_fragments_message = create_inventory_fragments_message(&self.device_name)?;
-
-        let supported_operations_message = create_supported_operations_fragments()?;
-
+        let supported_operations_message = create_supported_operations_fragments_message()?;
         let device_data_message =
             create_device_data_fragments(&self.device_name, &self.device_type)?;
+        let supported_log_types_message = create_supported_log_types_message()?;
+        let pending_operations_message = create_get_pending_operations_message()?;
+        let software_list_message = create_get_software_list_message()?;
 
         Ok(vec![
+            inventory_fragments_message,
             supported_operations_message,
             device_data_message,
-            inventory_fragments_message,
+            supported_log_types_message,
+            pending_operations_message,
+            software_list_message,
         ])
     }
 
@@ -226,6 +239,154 @@ impl Converter for CumulocityConverter {
         self.alarm_converter = AlarmConverter::Synced;
         sync_messages
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum AlarmConverter {
+    Syncing {
+        pending_alarms_map: HashMap<String, Message>,
+        old_alarms_map: HashMap<String, Message>,
+    },
+    Synced,
+}
+
+impl AlarmConverter {
+    fn new() -> Self {
+        AlarmConverter::Syncing {
+            old_alarms_map: HashMap::new(),
+            pending_alarms_map: HashMap::new(),
+        }
+    }
+
+    fn try_convert_alarm(&mut self, input: &Message) -> Result<Vec<Message>, ConversionError> {
+        let mut vec: Vec<Message> = Vec::new();
+
+        match self {
+            Self::Syncing {
+                pending_alarms_map,
+                old_alarms_map: _,
+            } => {
+                let alarm_id = input
+                    .topic
+                    .name
+                    .strip_prefix(TEDGE_ALARMS_TOPIC)
+                    .expect("Expected tedge/alarms prefix")
+                    .to_string();
+                pending_alarms_map.insert(alarm_id.clone(), input.clone());
+            }
+            Self::Synced => {
+                //Regular conversion phase
+                let tedge_alarm =
+                    ThinEdgeAlarm::try_from(input.topic.name.as_str(), input.payload_str()?)?;
+                let smartrest_alarm = alarm::serialize_alarm(tedge_alarm)?;
+                let c8y_alarm_topic = Topic::new_unchecked(SMARTREST_PUBLISH_TOPIC);
+                vec.push(Message::new(&c8y_alarm_topic, smartrest_alarm));
+
+                // Persist a copy of the alarm to an internal topic for reconciliation on next restart
+                let alarm_id = input
+                    .topic
+                    .name
+                    .strip_prefix(TEDGE_ALARMS_TOPIC)
+                    .expect("Expected tedge/alarms prefix")
+                    .to_string();
+                let topic =
+                    Topic::new_unchecked(format!("{INTERNAL_ALARMS_TOPIC}{alarm_id}").as_str());
+                let alarm_copy =
+                    Message::new(&topic, input.payload_bytes().to_owned()).with_retain();
+                vec.push(alarm_copy);
+            }
+        }
+
+        Ok(vec)
+    }
+
+    fn process_internal_alarm(&mut self, input: &Message) {
+        match self {
+            Self::Syncing {
+                pending_alarms_map: _,
+                old_alarms_map,
+            } => {
+                let alarm_id = input
+                    .topic
+                    .name
+                    .strip_prefix(INTERNAL_ALARMS_TOPIC)
+                    .expect("Expected c8y-internal/alarms prefix")
+                    .to_string();
+                old_alarms_map.insert(alarm_id, input.clone());
+            }
+            Self::Synced => {
+                // Ignore
+            }
+        }
+    }
+
+    /// Detect and sync any alarms that were raised/cleared while this mapper process was not running.
+    /// For this syncing logic, converter maintains an internal journal of all the alarms processed by this mapper,
+    /// which is compared against all the live alarms seen by the mapper on every startup.
+    ///
+    /// All the live alarms are received from tedge/alarms topic on startup.
+    /// Similarly, all the previously processed alarms are received from c8y-internal/alarms topic.
+    /// Sync detects the difference between these two sets, which are the missed messages.
+    ///
+    /// An alarm that is present in c8y-internal/alarms, but not in tedge/alarms topic
+    /// is assumed to have been cleared while the mapper process was down.
+    /// Similarly, an alarm that is present in tedge/alarms, but not in c8y-internal/alarms topic
+    /// is one that was raised while the mapper process was down.
+    /// An alarm present in both, if their payload is the same, is one that was already processed before the restart
+    /// and hence can be ignored during sync.
+    fn sync(&mut self) -> Vec<Message> {
+        let mut sync_messages: Vec<Message> = Vec::new();
+
+        match self {
+            Self::Syncing {
+                pending_alarms_map,
+                old_alarms_map,
+            } => {
+                // Compare the differences between alarms in tedge/alarms topic to the ones in c8y-internal/alarms topic
+                old_alarms_map.drain().for_each(|(alarm_id, old_message)| {
+                    match pending_alarms_map.entry(alarm_id.clone()) {
+                        // If an alarm that is present in c8y-internal/alarms topic is not present in tedge/alarms topic,
+                        // it is assumed to have been cleared while the mapper process was down
+                        Entry::Vacant(_) => {
+                            let topic = Topic::new_unchecked(
+                                format!("{}{}", TEDGE_ALARMS_TOPIC, alarm_id).as_str(),
+                            );
+                            let message = Message::new(&topic, vec![]).with_retain();
+                            // Recreate the clear alarm message and add it to the pending alarms list to be processed later
+                            sync_messages.push(message);
+                        }
+
+                        // If the payload of a message received from tedge/alarms is same as one received from c8y-internal/alarms,
+                        // it is assumed to be one that was already processed earlier and hence removed from the pending alarms list.
+                        Entry::Occupied(entry) => {
+                            if entry.get().payload_bytes() == old_message.payload_bytes() {
+                                entry.remove();
+                            }
+                        }
+                    }
+                });
+
+                pending_alarms_map
+                    .drain()
+                    .for_each(|(_key, message)| sync_messages.push(message));
+            }
+            Self::Synced => {
+                // Ignore
+            }
+        }
+
+        sync_messages
+    }
+}
+fn create_device_data_fragments(
+    device_name: &str,
+    device_type: &str,
+) -> Result<Message, ConversionError> {
+    let device_data = C8yDeviceDataFragment::from_type(device_type)?;
+    let ops_msg = device_data.to_json()?;
+
+    let topic = Topic::new_unchecked(&format!("{INVENTORY_MANAGED_OBJECTS_TOPIC}/{device_name}",));
+    Ok(Message::new(&topic, ops_msg.to_string()))
 }
 
 enum AlarmConverter {

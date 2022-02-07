@@ -13,31 +13,19 @@ use crate::{
     },
 };
 
-use agent_interface::{
-    topic::*, Jsonify, OperationStatus, RestartOperationRequest, RestartOperationResponse,
-    SoftwareListRequest, SoftwareListResponse, SoftwareUpdateResponse,
-};
+use agent_interface::topic::ResponseTopic;
 use async_trait::async_trait;
-use c8y_smartrest::{
-    error::SmartRestDeserializerError,
-    smartrest_deserializer::{
-        SmartRestLogRequest, SmartRestRestartRequest, SmartRestUpdateSoftware,
-    },
-    smartrest_serializer::{
-        CumulocitySupportedOperations, SmartRestGetPendingOperations, SmartRestSerializer,
-        SmartRestSetOperationToExecuting, SmartRestSetOperationToFailed,
-        SmartRestSetOperationToSuccessful, SmartRestSetSupportedLogType,
-    },
+use mqtt_channel::{Config, TopicFilter};
+use tedge_config::{
+    ConfigSettingAccessor, DeviceIdSetting, DeviceTypeSetting, MqttPortSetting, TEdgeConfig,
 };
-use chrono::{DateTime, FixedOffset};
-use download::{Auth, DownloadInfo};
-use mqtt_channel::{Config, Connection, MqttError, SinkExt, StreamExt, Topic, TopicFilter};
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use tracing::{info, info_span, Instrument};
 
-use std::{convert::TryInto, process::Stdio};
-use tedge_config::{ConfigSettingAccessor, MqttPortSetting, TEdgeConfig};
-use tracing::{debug, error, info, instrument};
+use super::topic::C8yTopic;
+
+const CUMULOCITY_MAPPER_NAME: &str = "tedge-mapper-c8y";
+const AGENT_LOG_DIR: &str = "/var/log/tedge/agent";
+const SM_MAPPER: &str = "SM-C8Y-Mapper";
 
 use super::c8y_converter::CumulocityConverter;
 
@@ -82,6 +70,43 @@ impl CumulocitySoftwareManagementMapper {
         let mqtt_topic = CumulocitySoftwareManagementMapper::subscriptions(&operations)?;
         let config = Config::default()
             .with_session_name(SM_MAPPER)
+            .with_clean_session(true)
+            .with_subscriptions(mqtt_topic);
+        mqtt_channel::clear_session(&config).await?;
+        Ok(())
+    }
+
+    pub fn subscriptions(operations: &Operations) -> Result<TopicFilter, anyhow::Error> {
+        let mut topic_filter = TopicFilter::new(ResponseTopic::SoftwareListResponse.as_str())?;
+        topic_filter.add(ResponseTopic::SoftwareUpdateResponse.as_str())?;
+        topic_filter.add(C8yTopic::SmartRestRequest.as_str())?;
+        topic_filter.add(ResponseTopic::RestartResponse.as_str())?;
+
+        for topic in operations.topics_for_operations() {
+            topic_filter.add(&topic)?
+        }
+
+        Ok(topic_filter)
+    }
+
+    pub async fn init_session(&mut self) -> Result<(), anyhow::Error> {
+        info!("Initialize tedge sm mapper session");
+        let operations = Operations::try_new("/etc/tedge/operations", "c8y")?;
+        let mqtt_topic = Self::subscriptions(&operations)?;
+        let config = Config::default()
+            .with_session_name(CUMULOCITY_MAPPER_NAME)
+            .with_clean_session(false)
+            .with_subscriptions(mqtt_topic);
+        mqtt_channel::init_session(&config).await?;
+        Ok(())
+    }
+
+    pub async fn clear_session(&mut self) -> Result<(), anyhow::Error> {
+        info!("Clear tedge sm mapper session");
+        let operations = Operations::try_new("/etc/tedge/operations", "c8y")?;
+        let mqtt_topic = Self::subscriptions(&operations)?;
+        let config = Config::default()
+            .with_session_name(CUMULOCITY_MAPPER_NAME)
             .with_clean_session(true)
             .with_subscriptions(mqtt_topic);
         mqtt_channel::clear_session(&config).await?;

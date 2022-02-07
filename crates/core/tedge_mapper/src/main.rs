@@ -87,10 +87,10 @@ async fn main() -> anyhow::Result<()> {
     let _flock = check_another_instance_is_not_running(&mapper.name.to_string())?;
 
     if mapper.init {
-        let mut mapper = CumulocitySoftwareManagementMapper::new();
+        let mut mapper = CumulocityMapper::new();
         mapper.init_session().await
     } else if mapper.clear {
-        let mut mapper = CumulocitySoftwareManagementMapper::new();
+        let mut mapper = CumulocityMapper::new();
         mapper.clear_session().await
     } else {
         component.start(config).await
