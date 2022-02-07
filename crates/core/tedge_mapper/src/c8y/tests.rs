@@ -1,9 +1,6 @@
 use crate::{
-    c8y::{
-        http_proxy::{C8YHttpProxy, JwtAuthHttpProxy},
-        sm_mapper::{CumulocitySoftwareManagement, CumulocitySoftwareManagementMapper},
-    },
-    mapping::operations::Operations,
+    c8y::http_proxy::{C8YHttpProxy, JwtAuthHttpProxy},
+    mapping::{mapper::create_mapper, operations::Operations, size_threshold::SizeThreshold},
 };
 
 use mqtt_channel::{Connection, TopicFilter};
@@ -14,9 +11,9 @@ use serial_test::serial;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
-use super::http_proxy::FakeC8YHttpProxy;
+use super::{converter::CumulocityConverter, http_proxy::FakeC8YHttpProxy};
 
-const TEST_TIMEOUT_MS: Duration = Duration::from_millis(1000);
+const TEST_TIMEOUT_MS: Duration = Duration::from_millis(5000);
 
 #[tokio::test]
 #[serial]

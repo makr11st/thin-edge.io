@@ -4,7 +4,7 @@ mod fragments;
 mod http_proxy;
 mod json_c8y;
 pub mod mapper;
-pub mod sm_mapper;
+mod operations;
 pub mod topic;
 
 #[cfg(test)]
