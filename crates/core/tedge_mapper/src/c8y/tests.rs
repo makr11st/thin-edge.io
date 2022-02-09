@@ -3,8 +3,6 @@ use c8y_api::http_proxy::{C8YHttpProxy, FakeC8YHttpProxy, JwtAuthHttpProxy};
 use c8y_smartrest::operations::Operations;
 use mqtt_channel::{Connection, TopicFilter};
 use mqtt_tests::test_mqtt_server::MqttProcessHandler;
-use mqtt_tests::with_timeout::{Maybe, WithTimeout};
-use mqtt_tests::StreamExt;
 use serial_test::serial;
 use std::time::Duration;
 use tokio::task::JoinHandle;
@@ -27,13 +25,7 @@ async fn mapper_publishes_a_software_list_request() {
     let sm_mapper = start_c8y_mapper(broker.port).await;
 
     // Expect on `tedge/commands/req/software/list` a software list request.
-    let msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received after a second.");
-    dbg!(&msg);
-    assert!(&msg.contains(r#"{"id":"#));
+    mqtt_tests::assert_received_all_expected(&mut messages, TEST_TIMEOUT_MS, &[r#"{"id":"#]).await;
 
     sm_mapper.unwrap().abort();
 }
@@ -48,29 +40,14 @@ async fn mapper_publishes_a_supported_operation_and_a_pending_operations_onto_c8
     // Start SM Mapper
     let sm_mapper = start_c8y_mapper(broker.port).await;
 
-    let mut msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    while !msg.contains("114") {
-        msg = messages
-            .next()
-            .with_timeout(TEST_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-        dbg!(&msg);
-    }
-
-    // Expect both 114 and 500 messages has been received on `c8y/s/us`, if no msg received for the timeout the test fails.
-    mqtt_tests::assert_received(
+    // Expect both 118 and 500 messages has been received on `c8y/s/us`, if no msg received for the timeout the test fails.
+    mqtt_tests::assert_received_all_expected(
         &mut messages,
         TEST_TIMEOUT_MS,
-        vec!["118,software-management\n", "500\n"],
+        &["118,software-management\n", "500\n"],
     )
     .await;
+
     sm_mapper.unwrap().abort();
 }
 
@@ -105,14 +82,13 @@ async fn mapper_publishes_software_update_request() {
             }"#;
 
     // Expect thin-edge json message on `tedge/commands/req/software/update` with expected payload.
-    let msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received after a second.");
-    dbg!(&msg);
-    assert!(&msg.contains("{\"id\":\""));
-    assert!(&msg.contains(&remove_whitespace(expected_update_list)));
+    mqtt_tests::assert_received_all_expected(
+        &mut messages,
+        TEST_TIMEOUT_MS,
+        &["{\"id\":\"", &remove_whitespace(expected_update_list)],
+    )
+    .await;
+
     sm_mapper.unwrap().abort();
 }
 
@@ -129,22 +105,6 @@ async fn mapper_publishes_software_update_status_onto_c8y_topic() {
     let sm_mapper = start_c8y_mapper(broker.port).await;
     let _ = publish_a_fake_jwt_token(broker).await;
 
-    let mut msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    while !msg.contains("500") {
-        msg = messages
-            .next()
-            .with_timeout(TEST_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-        dbg!(&msg);
-    }
-
     // Prepare and publish a software update status response message `executing` on `tedge/commands/res/software/update`.
     let json_response = r#"{
             "id": "123",
@@ -157,12 +117,12 @@ async fn mapper_publishes_software_update_status_onto_c8y_topic() {
         .unwrap();
 
     // Expect `501` smartrest message on `c8y/s/us`.
-    let msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received after a second.");
-    assert_eq!(&msg, "501,c8y_SoftwareUpdate\n");
+    mqtt_tests::assert_received_all_expected(
+        &mut messages,
+        TEST_TIMEOUT_MS,
+        &["501,c8y_SoftwareUpdate\n"],
+    )
+    .await;
 
     // Prepare and publish a software update response `successful`.
     let json_response = r#"{
@@ -180,12 +140,12 @@ async fn mapper_publishes_software_update_status_onto_c8y_topic() {
         .unwrap();
 
     // Expect `503` messages with correct payload have been received on `c8y/s/us`, if no msg received for the timeout the test fails.
-    let msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received after a second.");
-    assert_eq!(&msg, "503,c8y_SoftwareUpdate,\n");
+    mqtt_tests::assert_received_all_expected(
+        &mut messages,
+        TEST_TIMEOUT_MS,
+        &["503,c8y_SoftwareUpdate,\n"],
+    )
+    .await;
 
     sm_mapper.unwrap().abort();
 }
@@ -199,22 +159,6 @@ async fn mapper_publishes_software_update_failed_status_onto_c8y_topic() {
     // Start SM Mapper
     let sm_mapper = start_c8y_mapper(broker.port).await;
     let _ = publish_a_fake_jwt_token(broker).await;
-
-    let mut msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    while !msg.contains("500") {
-        msg = messages
-            .next()
-            .with_timeout(TEST_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-        dbg!(&msg);
-    }
 
     // The agent publish an error
     let json_response = r#"
@@ -242,15 +186,13 @@ async fn mapper_publishes_software_update_failed_status_onto_c8y_topic() {
         .unwrap();
 
     // `502` messages with correct payload have been received on `c8y/s/us`, if no msg received for the timeout the test fails.
-    let msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received after a second.");
-    assert_eq!(
-        &msg,
-        "502,c8y_SoftwareUpdate,\"Partial failure: Couldn\'t install collectd and nginx\"\n"
-    );
+
+    mqtt_tests::assert_received_all_expected(
+        &mut messages,
+        TEST_TIMEOUT_MS,
+        &["502,c8y_SoftwareUpdate,\"Partial failure: Couldn\'t install collectd and nginx\"\n"],
+    )
+    .await;
 
     sm_mapper.unwrap().abort();
 }
@@ -280,21 +222,6 @@ async fn mapper_fails_during_sw_update_recovers_and_process_response() -> Result
     // Start SM Mapper
     let sm_mapper = start_c8y_mapper(broker.port).await?;
 
-    let mut msg = responses
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    while !msg.contains("500") {
-        msg = responses
-            .next()
-            .with_timeout(TEST_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-        dbg!(&msg);
-    }
     // Prepare and publish a software update smartrest request on `c8y/s/ds`.
     let smartrest = r#"528,external_id,nodered,1.0.0::debian,,install"#;
     let _ = broker.publish("c8y/s/ds", smartrest).await.unwrap();
@@ -314,12 +241,12 @@ async fn mapper_fails_during_sw_update_recovers_and_process_response() -> Result
             }"#;
 
     // Wait for the request being published by the mapper on `tedge/commands/req/software/update`.
-    let msg = requests
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received after a second.");
-    assert!(msg.contains(&remove_whitespace(expected_update_list)));
+    mqtt_tests::assert_received_all_expected(
+        &mut requests,
+        TEST_TIMEOUT_MS,
+        &[&remove_whitespace(expected_update_list)],
+    )
+    .await;
 
     // Stop the SM Mapper (simulating a failure)
     sm_mapper.abort();
@@ -353,10 +280,10 @@ async fn mapper_fails_during_sw_update_recovers_and_process_response() -> Result
 
     // Validate that the mapper process the response and forward it on 'c8y/s/us'
     // Expect init messages followed by a 503 (success)
-    mqtt_tests::assert_received(
+    mqtt_tests::assert_received_all_expected(
         &mut responses,
-        TEST_TIMEOUT_MS * 5,
-        vec![
+        TEST_TIMEOUT_MS,
+        &[
             "118,software-management\n",
             "500\n",
             "503,c8y_SoftwareUpdate,\n",
@@ -384,34 +311,16 @@ async fn mapper_publishes_software_update_request_with_wrong_action() {
 
     let _sm_mapper = start_c8y_mapper(broker.port).await;
 
-    let mut msg = messages
-        .next()
-        .with_timeout(TEST_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    while !msg.contains("500") {
-        msg = messages
-            .next()
-            .with_timeout(TEST_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-        dbg!(&msg);
-    }
-
     // Prepare and publish a c8y_SoftwareUpdate smartrest request on `c8y/s/ds` that contains a wrong action `remove`, that is not known by c8y.
     let smartrest = r#"528,external_id,nodered,1.0.0::debian,,remove"#;
     let _ = broker.publish("c8y/s/ds", smartrest).await.unwrap();
 
     // Expect a 501 (executing) followed by a 502 (failed)
-    mqtt_tests::assert_received(
+    mqtt_tests::assert_received_all_expected(
         &mut messages,
         TEST_TIMEOUT_MS,
-        vec![
-        "501,c8y_SoftwareUpdate",
-        "502,c8y_SoftwareUpdate,\"Parameter remove is not recognized. It must be install or delete.\"",
-    ],
+        &["501,c8y_SoftwareUpdate",
+        "502,c8y_SoftwareUpdate,\"Parameter remove is not recognized. It must be install or delete.\""],
     )
     .await;
 }
@@ -447,8 +356,6 @@ async fn get_jwt_token_full_run() {
     assert_eq!(jwt_token.unwrap().token(), "1111");
 }
 
-const ALARM_SYNC_TIMEOUT_MS: Duration = Duration::from_millis(5000);
-
 #[tokio::test]
 #[serial]
 async fn c8y_mapper_alarm_mapping_to_smartrest() {
@@ -469,26 +376,13 @@ async fn c8y_mapper_alarm_mapping_to_smartrest() {
         .await
         .unwrap();
 
-    let mut msg = messages
-        .next()
-        .with_timeout(ALARM_SYNC_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    // The first message could be SmartREST 114 for supported operations
-    while !msg.contains("302") {
-        // Fetch the next message which should be the alarm
-        msg = messages
-            .next()
-            .with_timeout(ALARM_SYNC_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-    }
-
     // Expect converted temperature alarm message
-    dbg!(&msg);
-    assert!(msg.contains("302,temperature_alarm"));
+    mqtt_tests::assert_received_all_expected(
+        &mut messages,
+        TEST_TIMEOUT_MS,
+        &["302,temperature_alarm"],
+    )
+    .await;
 
     //Clear the previously published alarm
     let _ = broker
@@ -524,26 +418,13 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
         .await
         .unwrap();
 
-    let mut msg = messages
-        .next()
-        .with_timeout(ALARM_SYNC_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    // The first message could be SmartREST 114 for supported operations
-    while !msg.contains("301") {
-        // Fetch the next message which should be the alarm
-        msg = messages
-            .next()
-            .with_timeout(ALARM_SYNC_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-        dbg!(&msg);
-    }
-
     // Expect converted temperature alarm message
-    assert!(&msg.contains("301,temperature_alarm"));
+    mqtt_tests::assert_received_all_expected(
+        &mut messages,
+        TEST_TIMEOUT_MS,
+        &["301,temperature_alarm"],
+    )
+    .await;
 
     c8y_mapper.abort();
 
@@ -573,24 +454,6 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     // Restart the C8Y Mapper
     let _ = start_c8y_mapper(broker.port).await.unwrap();
 
-    let mut msg = messages
-        .next()
-        .with_timeout(ALARM_SYNC_TIMEOUT_MS)
-        .await
-        .expect_or("No message received before timeout");
-    dbg!(&msg);
-
-    // The first message could be SmartREST 114 for supported operations
-    while !msg.contains("301") {
-        // Fetch the next message which should be the alarm
-        msg = messages
-            .next()
-            .with_timeout(ALARM_SYNC_TIMEOUT_MS)
-            .await
-            .expect_or("No message received before timeout");
-        dbg!(&msg);
-    }
-
     // Ignored until the rumqttd broker bug that doesn't handle empty retained messages
     // Expect the previously missed clear temperature alarm message
     // let msg = messages
@@ -602,7 +465,12 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     // assert!(&msg.contains("306,temperature_alarm"));
 
     // Expect the new pressure alarm message
-    assert!(&msg.contains("301,pressure_alarm"));
+    mqtt_tests::assert_received_all_expected(
+        &mut messages,
+        TEST_TIMEOUT_MS,
+        &["301,pressure_alarm"],
+    )
+    .await;
 
     c8y_mapper.abort();
 }

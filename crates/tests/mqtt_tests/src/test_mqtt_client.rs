@@ -52,8 +52,8 @@ pub async fn assert_received<T>(
     }
 }
 
-/// Check that a list of messages has been received in the given order
-pub async fn assert_received_after<T>(
+/// Push received `messages` until all messages containing `expected` strings have been received or until `timeout`.
+pub async fn assert_received_all_expected<T>(
     messages: &mut UnboundedReceiver<String>,
     timeout: Duration,
     expected: T,
@@ -61,10 +61,19 @@ pub async fn assert_received_after<T>(
     T: IntoIterator,
     T::Item: ToString,
 {
-    for expected_msg in expected.into_iter() {
-        let actual_msg = messages.next().with_timeout(timeout).await;
-        assert_eq!(actual_msg, Ok(Some(expected_msg.to_string())));
+    let mut expected = expected
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
+    while let Ok(Some(msg)) = messages.next().with_timeout(timeout).await {
+        expected.retain(|expected_msg| !msg.contains(expected_msg));
+        if expected.is_empty() {
+            return;
+        }
     }
+
+    assert!(expected.is_empty());
 }
 
 /// Publish a message
