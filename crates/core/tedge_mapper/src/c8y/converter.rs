@@ -1,6 +1,4 @@
-use crate::mapping::{
-    converter::*, error::*, operations::Operations, size_threshold::SizeThreshold,
-};
+use crate::core::{converter::*, error::*, size_threshold::SizeThreshold};
 use agent_interface::{
     topic::{RequestTopic, ResponseTopic},
     Auth, DownloadInfo, Jsonify, OperationStatus, RestartOperationRequest,
@@ -12,6 +10,7 @@ use c8y_smartrest::{
     alarm,
     error::SmartRestDeserializerError,
     event::serialize_event,
+    operations::Operations,
     smartrest_deserializer::{SmartRestRestartRequest, SmartRestUpdateSoftware},
     smartrest_serializer::{
         CumulocitySupportedOperations, SmartRestGetPendingOperations, SmartRestSerializer,
@@ -46,6 +45,7 @@ const INVENTORY_MANAGED_OBJECTS_TOPIC: &str = "c8y/inventory/managedObjects/upda
 const SMARTREST_PUBLISH_TOPIC: &str = "c8y/s/us";
 const TEDGE_ALARMS_TOPIC: &str = "tedge/alarms/";
 const INTERNAL_ALARMS_TOPIC: &str = "c8y-internal/alarms/";
+const TEDGE_EVENTS_TOPIC: &str = "tedge/events/";
 
 #[derive(Debug)]
 pub struct CumulocityConverter<Proxy>
@@ -177,6 +177,7 @@ where
                 self.alarm_converter.process_internal_alarm(message);
                 Ok(vec![])
             }
+            topic if topic.name.starts_with(TEDGE_EVENTS_TOPIC) => self.try_convert_event(message),
             topic => match topic.clone().try_into() {
                 Ok(MapperSubscribeTopic::ResponseTopic(ResponseTopic::SoftwareListResponse)) => {
                     debug!("Software list");

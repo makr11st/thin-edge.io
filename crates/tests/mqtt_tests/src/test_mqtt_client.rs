@@ -52,6 +52,21 @@ pub async fn assert_received<T>(
     }
 }
 
+/// Check that a list of messages has been received in the given order
+pub async fn assert_received_after<T>(
+    messages: &mut UnboundedReceiver<String>,
+    timeout: Duration,
+    expected: T,
+) where
+    T: IntoIterator,
+    T::Item: ToString,
+{
+    for expected_msg in expected.into_iter() {
+        let actual_msg = messages.next().with_timeout(timeout).await;
+        assert_eq!(actual_msg, Ok(Some(expected_msg.to_string())));
+    }
+}
+
 /// Publish a message
 ///
 /// Return only when the message has been acknowledged.
