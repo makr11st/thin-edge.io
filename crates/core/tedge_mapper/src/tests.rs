@@ -6,7 +6,9 @@ use serial_test::serial;
 use tokio::task::JoinHandle;
 
 use crate::{
-    c8y_converter::CumulocityConverter, mapper::create_mapper, size_threshold::SizeThreshold,
+    c8y::{converter::CumulocityConverter, http_proxy::FakeC8YHttpProxy},
+    mapping::size_threshold::SizeThreshold,
+    mapping::{mapper::create_mapper, operations::Operations},
 };
 
 const ALARM_SYNC_TIMEOUT_MS: Duration = Duration::from_millis(5000);
@@ -39,7 +41,7 @@ async fn c8y_mapper_alarm_mapping_to_smartrest() {
     dbg!(&msg);
 
     // The first message could be SmartREST 114 for supported operations
-    if msg.contains("114") {
+    while !msg.contains("302") {
         // Fetch the next message which should be the alarm
         msg = messages
             .next()
@@ -94,7 +96,7 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     dbg!(&msg);
 
     // The first message could be SmartREST 114 for supported operations
-    if msg.contains("114") {
+    while !msg.contains("301") {
         // Fetch the next message which should be the alarm
         msg = messages
             .next()
@@ -143,7 +145,7 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     dbg!(&msg);
 
     // The first message could be SmartREST 114 for supported operations
-    if msg.contains("114") {
+    while !msg.contains("301") {
         // Fetch the next message which should be the alarm
         msg = messages
             .next()
@@ -173,10 +175,15 @@ async fn start_c8y_mapper(mqtt_port: u16) -> Result<JoinHandle<()>, anyhow::Erro
     let device_name = "test-device".into();
     let device_type = "test-device-type".into();
     let size_threshold = SizeThreshold(16 * 1024);
+    let operations = Operations::new();
+    let http_proxy = FakeC8YHttpProxy {};
+
     let converter = Box::new(CumulocityConverter::new(
         size_threshold,
         device_name,
         device_type,
+        operations,
+        http_proxy,
     ));
 
     let mut mapper = create_mapper("c8y-mapper-test", mqtt_port, converter).await?;

@@ -1,8 +1,10 @@
-use crate::sm_c8y_mapper::error::SMCumulocityMapperError;
-use crate::sm_c8y_mapper::json_c8y::{
-    C8yCreateEvent, C8yManagedObject, C8yUpdateSoftwareListResponse, InternalIdResponse,
+use crate::c8y::{
+    error::SMCumulocityMapperError,
+    json_c8y::{
+        C8yCreateEvent, C8yManagedObject, C8yUpdateSoftwareListResponse, InternalIdResponse,
+    },
 };
-use crate::sm_c8y_mapper::mapper::SmartRestLogEvent;
+
 use async_trait::async_trait;
 use c8y_smartrest::smartrest_deserializer::SmartRestJwtResponse;
 use chrono::{DateTime, Local};
@@ -15,11 +17,13 @@ use tedge_config::{
 };
 use tracing::{error, info, instrument};
 
+use super::operations::SmartRestLogEvent;
+
 const RETRY_TIMEOUT_SECS: u64 = 60;
 
 /// An HttpProxy handles http requests to C8y on behalf of the device.
 #[async_trait]
-pub trait C8YHttpProxy {
+pub trait C8YHttpProxy: Send + Sync {
     async fn init(&mut self) -> Result<(), SMCumulocityMapperError>;
 
     fn url_is_in_my_tenant_domain(&self, url: &str) -> bool;
@@ -207,7 +211,7 @@ impl JwtAuthHttpProxy {
         };
 
         C8yCreateEvent::new(
-            c8y_managed_object.to_owned(),
+            c8y_managed_object,
             "c8y_Logfile",
             &local.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
             "software-management",
@@ -328,6 +332,39 @@ impl C8YHttpProxy for JwtAuthHttpProxy {
 
         let _response = self.http_con.execute(request).await?;
         Ok(binary_upload_event_url)
+    }
+}
+
+#[cfg(test)]
+pub struct FakeC8YHttpProxy {}
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl C8YHttpProxy for FakeC8YHttpProxy {
+    async fn init(&mut self) -> Result<(), SMCumulocityMapperError> {
+        Ok(())
+    }
+
+    fn url_is_in_my_tenant_domain(&self, _url: &str) -> bool {
+        true
+    }
+
+    async fn get_jwt_token(&mut self) -> Result<SmartRestJwtResponse, SMCumulocityMapperError> {
+        Ok(SmartRestJwtResponse::try_new("71,fake-token")?)
+    }
+
+    async fn send_software_list_http(
+        &mut self,
+        _c8y_software_list: &C8yUpdateSoftwareListResponse,
+    ) -> Result<(), SMCumulocityMapperError> {
+        Ok(())
+    }
+
+    async fn upload_log_binary(
+        &mut self,
+        _log_content: &str,
+    ) -> Result<String, SMCumulocityMapperError> {
+        Ok("fake/upload/url".into())
     }
 }
 
