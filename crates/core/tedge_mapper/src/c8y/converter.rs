@@ -185,21 +185,17 @@ where
                         message.payload_str()?,
                         &mut self.http_proxy,
                     )
-                    .await
-                    .unwrap())
+                    .await?)
                 }
                 Ok(MapperSubscribeTopic::ResponseTopic(ResponseTopic::SoftwareUpdateResponse)) => {
                     debug!("Software update");
                     Ok(
                         publish_operation_status(message.payload_str()?, &mut self.http_proxy)
-                            .await
-                            .unwrap(),
+                            .await?,
                     )
                 }
                 Ok(MapperSubscribeTopic::ResponseTopic(ResponseTopic::RestartResponse)) => {
-                    Ok(publish_restart_operation_status(message.payload_str()?)
-                        .await
-                        .unwrap())
+                    Ok(publish_restart_operation_status(message.payload_str()?).await?)
                 }
                 Ok(MapperSubscribeTopic::C8yTopic(_)) => {
                     debug!("Cumulocity");

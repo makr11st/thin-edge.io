@@ -1,4 +1,4 @@
-use crate::core::size_threshold::SizeThresholdExceeded;
+use crate::{c8y::error::CumulocityMapperError, core::size_threshold::SizeThresholdExceeded};
 
 use c8y_smartrest::error::OperationsError;
 use mqtt_channel::MqttError;
@@ -30,6 +30,9 @@ pub enum ConversionError {
 
     #[error(transparent)]
     FromCumulocityJsonError(#[from] c8y_translator::json::CumulocityJsonError),
+
+    #[error(transparent)]
+    FromCumulocityCumulocityMapperError(#[from] CumulocityMapperError),
 
     #[error(transparent)]
     FromThinEdgeJsonSerialization(#[from] ThinEdgeJsonSerializationError),
