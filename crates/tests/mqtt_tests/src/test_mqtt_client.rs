@@ -66,8 +66,11 @@ pub async fn assert_received_all_expected<T>(
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
+    let mut received = Vec::new();
+
     while let Ok(Some(msg)) = messages.next().with_timeout(timeout).await {
         expected.retain(|expected_msg| !msg.contains(expected_msg));
+        received.push(msg);
         if expected.is_empty() {
             return;
         }
@@ -75,7 +78,7 @@ pub async fn assert_received_all_expected<T>(
 
     assert!(
         expected.is_empty(),
-        "Didn't receive all expected messages: {expected:?}",
+        "Didn't receive all expected messages: {expected:?}\n Received: {received:?}",
     );
 }
 
