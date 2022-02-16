@@ -73,7 +73,10 @@ pub async fn assert_received_all_expected<T>(
         }
     }
 
-    assert!(expected.is_empty());
+    assert!(
+        expected.is_empty(),
+        "Didn't receive all expected messages: {expected:?}",
+    );
 }
 
 /// Publish a message
