@@ -199,37 +199,7 @@ where
                 }
                 Ok(MapperSubscribeTopic::C8yTopic(_)) => {
                     debug!("Cumulocity");
-                    match process_smartrest(
-                        message.payload_str()?,
-                        &self.operations,
-                        &mut self.http_proxy,
-                    )
-                    .await
-                    {
-                        Err(
-                            ref err @ CumulocityMapperError::FromSmartRestDeserializer(
-                                SmartRestDeserializerError::InvalidParameter {
-                                    ref operation, ..
-                                },
-                            ),
-                        ) => {
-                            let topic = C8yTopic::SmartRestResponse.to_topic()?;
-                            let msg1 = Message::new(&topic, format!("501,{}", operation));
-                            let msg2 = Message::new(
-                                &topic,
-                                format!("502,{},\"{}\"", operation, &err.to_string()),
-                            );
-                            error!("{}", err);
-                            return Ok(vec![msg1, msg2]);
-                        }
-
-                        Err(err) => {
-                            error!("{}", err);
-                            Ok(vec![])
-                        }
-
-                        Ok(msgs) => Ok(msgs),
-                    }
+                    parse_c8y_topics(message, &self.operations, &mut self.http_proxy).await
                 }
                 _ => Err(ConversionError::UnsupportedTopic(
                     message.topic.name.clone(),
@@ -261,6 +231,33 @@ where
         let sync_messages: Vec<Message> = self.alarm_converter.sync();
         self.alarm_converter = AlarmConverter::Synced;
         sync_messages
+    }
+}
+
+async fn parse_c8y_topics(
+    message: &Message,
+    operations: &Operations,
+    http_proxy: &mut impl C8YHttpProxy,
+) -> Result<Vec<Message>, ConversionError> {
+    match process_smartrest(message.payload_str()?, operations, http_proxy).await {
+        Err(
+            ref err @ CumulocityMapperError::FromSmartRestDeserializer(
+                SmartRestDeserializerError::InvalidParameter { ref operation, .. },
+            ),
+        ) => {
+            let topic = C8yTopic::SmartRestResponse.to_topic()?;
+            let msg1 = Message::new(&topic, format!("501,{operation}"));
+            let msg2 = Message::new(&topic, format!("502,{operation},\"{}\"", &err.to_string()));
+            error!("{err}");
+            Ok(vec![msg1, msg2])
+        }
+
+        Err(err) => {
+            error!("{err}");
+            Ok(vec![])
+        }
+
+        Ok(msgs) => Ok(msgs),
     }
 }
 
@@ -372,7 +369,7 @@ impl AlarmConverter {
                         // it is assumed to have been cleared while the mapper process was down
                         Entry::Vacant(_) => {
                             let topic = Topic::new_unchecked(
-                                format!("{}{}", TEDGE_ALARMS_TOPIC, alarm_id).as_str(),
+                                format!("{TEDGE_ALARMS_TOPIC}{alarm_id}").as_str(),
                             );
                             let message = Message::new(&topic, vec![]).with_retain();
                             // Recreate the clear alarm message and add it to the pending alarms list to be processed later
@@ -525,7 +522,7 @@ async fn validate_and_publish_software_list(
         }
 
         OperationStatus::Failed => {
-            error!("Received a failed software response: {}", payload);
+            error!("Received a failed software response: {payload}");
         }
 
         OperationStatus::Executing => {} // C8Y doesn't expect any message to be published
@@ -562,19 +559,8 @@ async fn process_smartrest(
     let message_id: &str = &payload[..3];
     match message_id {
         "528" => forward_software_request(payload, http_proxy).await,
-        // "522" => forward_log_request(payload).await,
         "510" => forward_restart_request(payload),
-        template => match operations.matching_smartrest_template(template) {
-            Some(operation) => {
-                if let Some(command) = operation.command() {
-                    execute_operation(payload, command.as_str()).await?;
-                }
-                Ok(vec![])
-            }
-            None => Err(CumulocityMapperError::UnknownOperation(
-                template.to_string(),
-            )),
-        },
+        template => forward_operation_request(payload, template, operations).await,
     }
 }
 
@@ -621,6 +607,24 @@ fn forward_restart_request(smartrest: &str) -> Result<Vec<Message>, CumulocityMa
     Ok(vec![Message::new(&topic, request.to_json()?)])
 }
 
+async fn forward_operation_request(
+    payload: &str,
+    template: &str,
+    operations: &Operations,
+) -> Result<Vec<Message>, CumulocityMapperError> {
+    match operations.matching_smartrest_template(template) {
+        Some(operation) => {
+            if let Some(command) = operation.command() {
+                execute_operation(payload, command.as_str()).await?;
+            }
+            Ok(vec![])
+        }
+        None => Err(CumulocityMapperError::UnknownOperation(
+            template.to_string(),
+        )),
+    }
+}
+
 /// reads a json file to serde_json::Value
 ///
 /// # Example
@@ -654,10 +658,7 @@ fn get_inventory_fragments(file_path: &str) -> Result<serde_json::Value, Convers
             Ok(json)
         }
         Err(_) => {
-            info!(
-                "Inventory fragments file not found at {}",
-                INVENTORY_FRAGMENTS_FILE_LOCATION
-            );
+            info!("Inventory fragments file not found at {INVENTORY_FRAGMENTS_FILE_LOCATION}");
             Ok(json_fragment)
         }
     }
