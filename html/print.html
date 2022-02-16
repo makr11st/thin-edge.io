@@ -3589,7 +3589,7 @@ total 2948
 <li><a href="references/./plugin-api.html">Plugin API</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-tedge-command"><a class="header" href="#the-tedge-command">The <code>tedge</code> command</a></h1>
-<pre><code>tedge 0.2.0
+<pre><code>tedge 0.5.3
 tedge is the cli tool for thin-edge.io
 
 USAGE:
@@ -3608,7 +3608,7 @@ SUBCOMMANDS:
     mqtt          Publish a message on a topic and subscribe a topic
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-tedge-config-command"><a class="header" href="#the-tedge-config-command">The <code>tedge config</code> command</a></h1>
-<pre><code>tedge-config 0.2.0
+<pre><code>tedge-config 0.5.3
 Configure Thin Edge
 
 USAGE:
@@ -3626,7 +3626,7 @@ SUBCOMMANDS:
     unset    Unset the provided configuration key
 </code></pre>
 <h2 id="get"><a class="header" href="#get">Get</a></h2>
-<pre><code>tedge-config-get 0.2.0
+<pre><code>tedge-config-get 0.5.3
 Get the value of the provided configuration key
 
 USAGE:
@@ -3640,7 +3640,7 @@ ARGS:
     &lt;key&gt;    Configuration key. Run `tedge config list --doc` for available keys
 </code></pre>
 <h2 id="set"><a class="header" href="#set">Set</a></h2>
-<pre><code>tedge-config-set 0.2.0
+<pre><code>tedge-config-set 0.5.3
 Set or update the provided configuration key with the given value
 
 USAGE:
@@ -3655,7 +3655,7 @@ ARGS:
     &lt;value&gt;    Configuration value
 </code></pre>
 <h2 id="list-2"><a class="header" href="#list-2">List</a></h2>
-<pre><code>tedge-config-list 0.2.0
+<pre><code>tedge-config-list 0.5.3
 Print the configuration keys and their values
 
 USAGE:
@@ -3668,7 +3668,7 @@ FLAGS:
     -V, --version    Prints version information
 </code></pre>
 <h2 id="unset"><a class="header" href="#unset">Unset</a></h2>
-<pre><code>tedge-config-unset 0.2.0
+<pre><code>tedge-config-unset 0.5.3
 Unset the provided configuration key
 
 USAGE:
@@ -3682,7 +3682,7 @@ ARGS:
     &lt;key&gt;    Configuration key. Run `tedge config list --doc` for available keys
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-tedge-cert-command"><a class="header" href="#the-tedge-cert-command">The <code>tedge cert</code> command</a></h1>
-<pre><code>tedge-cert 0.2.0
+<pre><code>tedge-cert 0.5.3
 Create and manage device certificate
 
 USAGE:
@@ -3700,7 +3700,7 @@ SUBCOMMANDS:
     upload    Upload root certificate
 </code></pre>
 <h2 id="create"><a class="header" href="#create">Create</a></h2>
-<pre><code>tedge-cert-create 0.2.0
+<pre><code>tedge-cert-create 0.5.3
 Create a self-signed device certificate
 
 USAGE:
@@ -3714,7 +3714,7 @@ OPTIONS:
         --device-id &lt;id&gt;    The device identifier to be used as the common name for the certificate
 </code></pre>
 <h2 id="show"><a class="header" href="#show">Show</a></h2>
-<pre><code>tedge-cert-show 0.2.0
+<pre><code>tedge-cert-show 0.5.3
 Show the device certificate, if any
 
 USAGE:
@@ -3725,7 +3725,7 @@ FLAGS:
     -V, --version    Prints version information
 </code></pre>
 <h2 id="remove-2"><a class="header" href="#remove-2">Remove</a></h2>
-<pre><code>tedge-cert-remove 0.2.0
+<pre><code>tedge-cert-remove 0.5.3
 Remove the device certificate
 
 USAGE:
@@ -3736,7 +3736,7 @@ FLAGS:
     -V, --version    Prints version information
 </code></pre>
 <h2 id="upload"><a class="header" href="#upload">Upload</a></h2>
-<pre><code>tedge-cert-upload 0.2.0
+<pre><code>tedge-cert-upload 0.5.3
 Upload root certificate
 
 USAGE:
@@ -3755,7 +3755,7 @@ SUBCOMMANDS:
     help    Prints this message or the help of the given subcommand(s)
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-tedge-connect-command"><a class="header" href="#the-tedge-connect-command">The <code>tedge connect</code> command</a></h1>
-<pre><code>tedge-connect 0.2.0
+<pre><code>tedge-connect 0.5.3
 Connect to connector provider
 
 USAGE:
@@ -3775,7 +3775,7 @@ SUBCOMMANDS:
     help    Prints this message or the help of the given subcommand(s)
 </code></pre>
 <h2 id="azure-1"><a class="header" href="#azure-1">Azure</a></h2>
-<pre><code>tedge-connect-az 0.2.0
+<pre><code>tedge-connect-az 0.5.3
 Create connection to Azure
 
 The command will create config and start edge relay from the device to az instance
@@ -3794,7 +3794,7 @@ FLAGS:
             Prints version information
 </code></pre>
 <h2 id="cumulocity-1"><a class="header" href="#cumulocity-1">Cumulocity</a></h2>
-<pre><code>tedge-connect-c8y 0.2.0
+<pre><code>tedge-connect-c8y 0.5.3
 Create connection to Cumulocity
 
 The command will create config and start edge relay from the device to c8y instance
@@ -3813,7 +3813,7 @@ FLAGS:
             Prints version information
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-tedge-disconnect-command"><a class="header" href="#the-tedge-disconnect-command">The <code>tedge disconnect</code> command</a></h1>
-<pre><code>tedge-disconnect 0.2.0
+<pre><code>tedge-disconnect 0.5.3
 Remove bridge connection for a provider
 
 USAGE:
@@ -3829,7 +3829,7 @@ SUBCOMMANDS:
     help    Prints this message or the help of the given subcommand(s)
 </code></pre>
 <h2 id="azure-2"><a class="header" href="#azure-2">Azure</a></h2>
-<pre><code>tedge-disconnect-az 0.2.0
+<pre><code>tedge-disconnect-az 0.5.3
 Remove bridge connection to Azure
 
 USAGE:
@@ -3840,7 +3840,7 @@ FLAGS:
     -V, --version    Prints version information
 </code></pre>
 <h2 id="cumulocity-2"><a class="header" href="#cumulocity-2">Cumulocity</a></h2>
-<pre><code>tedge-disconnect-c8y 0.2.0
+<pre><code>tedge-disconnect-c8y 0.5.3
 Remove bridge connection to Cumulocity
 
 USAGE:
@@ -3851,7 +3851,7 @@ FLAGS:
     -V, --version    Prints version information
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-tedge-mqtt-command"><a class="header" href="#the-tedge-mqtt-command">The <code>tedge mqtt</code> command</a></h1>
-<pre><code>tedge-mqtt 0.2.0
+<pre><code>tedge-mqtt 0.5.3
 Publish a message on a topic and subscribe a topic
 
 USAGE:
@@ -3867,14 +3867,15 @@ SUBCOMMANDS:
     sub     Subscribe a MQTT topic
 </code></pre>
 <h2 id="pub"><a class="header" href="#pub">Pub</a></h2>
-<pre><code>tedge-mqtt-pub 0.2.0
+<pre><code>tedge-mqtt-pub 0.5.3
 Publish a MQTT message on a topic
 
 USAGE:
-    tedge mqtt pub [OPTIONS] &lt;topic&gt; &lt;message&gt;
+    tedge mqtt pub [FLAGS] [OPTIONS] &lt;topic&gt; &lt;message&gt;
 
 FLAGS:
     -h, --help       Prints help information
+    -r, --retain     Retain flag
     -V, --version    Prints version information
 
 OPTIONS:
@@ -3885,7 +3886,7 @@ ARGS:
     &lt;message&gt;    Message to publish
 </code></pre>
 <h2 id="sub"><a class="header" href="#sub">Sub</a></h2>
-<pre><code>tedge-mqtt-sub 0.2.0
+<pre><code>tedge-mqtt-sub 0.5.3
 Subscribe a MQTT topic
 
 USAGE:
