@@ -18,7 +18,7 @@ use super::converter::{get_child_id_from_topic, CumulocityConverter};
 
 const TEST_TIMEOUT_MS: Duration = Duration::from_millis(5000);
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn mapper_publishes_a_software_list_request() {
     // The test assures the mapper publishes request for software list on `tedge/commands/req/software/list`.
@@ -37,7 +37,7 @@ async fn mapper_publishes_a_software_list_request() {
     sm_mapper.unwrap().abort();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn mapper_publishes_a_supported_operation_and_a_pending_operations_onto_c8y_topic() {
     // The test assures the mapper publishes smartrest messages 114 and 500 on `c8y/s/us` which shall be send over to the cloud if bridge connection exists.
@@ -58,7 +58,7 @@ async fn mapper_publishes_a_supported_operation_and_a_pending_operations_onto_c8
     sm_mapper.unwrap().abort();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn mapper_publishes_software_update_request() {
     // The test assures SM Mapper correctly receives software update request smartrest message on `c8y/s/ds`
@@ -99,7 +99,7 @@ async fn mapper_publishes_software_update_request() {
     sm_mapper.unwrap().abort();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn mapper_publishes_software_update_status_onto_c8y_topic() {
     // The test assures SM Mapper correctly receives software update response message on `tedge/commands/res/software/update`
@@ -157,7 +157,7 @@ async fn mapper_publishes_software_update_status_onto_c8y_topic() {
     sm_mapper.unwrap().abort();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn mapper_publishes_software_update_failed_status_onto_c8y_topic() {
     let broker = mqtt_tests::test_mqtt_broker();
@@ -204,7 +204,7 @@ async fn mapper_publishes_software_update_failed_status_onto_c8y_topic() {
     sm_mapper.unwrap().abort();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn mapper_fails_during_sw_update_recovers_and_process_response() -> Result<(), anyhow::Error>
 {
@@ -302,7 +302,7 @@ async fn mapper_fails_during_sw_update_recovers_and_process_response() -> Result
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn mapper_publishes_software_update_request_with_wrong_action() {
     // The test assures SM Mapper correctly receives software update request smartrest message on `c8y/s/ds`
@@ -363,7 +363,7 @@ async fn get_jwt_token_full_run() {
     assert_eq!(jwt_token.unwrap().token(), "1111");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn c8y_mapper_alarm_mapping_to_smartrest() {
     let broker = mqtt_tests::test_mqtt_broker();
@@ -405,7 +405,7 @@ async fn c8y_mapper_alarm_mapping_to_smartrest() {
     c8y_mapper.abort();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     let broker = mqtt_tests::test_mqtt_broker();
@@ -482,7 +482,7 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     c8y_mapper.abort();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn test_sync_alarms() {
     let size_threshold = SizeThreshold(16 * 1024);
@@ -548,7 +548,8 @@ async fn test_sync_alarms() {
     assert!(converter.convert(&internal_alarm_message).await.is_empty());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial]
 async fn convert_thin_edge_json_with_child_id() {
     let device_name = String::from("test");
     let device_type = String::from("test");
@@ -591,7 +592,8 @@ async fn convert_thin_edge_json_with_child_id() {
     assert_eq!(out_second_messages, vec![expected_c8y_json_message]);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial]
 async fn convert_first_thin_edge_json_invalid_then_valid_with_child_id() {
     let device_name = String::from("test");
     let device_type = String::from("test");
@@ -636,7 +638,8 @@ async fn convert_first_thin_edge_json_invalid_then_valid_with_child_id() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial]
 async fn convert_two_thin_edge_json_messages_given_different_child_id() {
     let device_name = String::from("test");
     let device_type = String::from("test");
