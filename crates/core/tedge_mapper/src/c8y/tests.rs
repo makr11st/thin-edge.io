@@ -482,51 +482,70 @@ async fn c8y_mapper_syncs_pending_alarms_on_startup() {
     c8y_mapper.abort();
 }
 
-pub struct FakeC8YHttpProxy {}
+#[tokio::test]
+#[serial]
+async fn test_sync_alarms() {
+    let size_threshold = SizeThreshold(16 * 1024);
+    let device_name = String::from("test");
+    let device_type = String::from("test_type");
+    let operations = Operations::new();
+    let http_proxy = FakeC8YHttpProxy {};
 
-#[async_trait::async_trait]
-impl C8YHttpProxy for FakeC8YHttpProxy {
-    async fn init(&mut self) -> Result<(), SMCumulocityMapperError> {
-        Ok(())
-    }
+    let mut converter = CumulocityConverter::new(
+        size_threshold,
+        device_name,
+        device_type,
+        operations,
+        http_proxy,
+    );
 
-    fn url_is_in_my_tenant_domain(&self, _url: &str) -> bool {
-        true
-    }
+    let alarm_topic = "tedge/alarms/critical/temperature_alarm";
+    let alarm_payload = r#"{ "message": "Temperature very high" }"#;
+    let alarm_message = Message::new(&Topic::new_unchecked(alarm_topic), alarm_payload);
 
-    async fn get_jwt_token(&mut self) -> Result<SmartRestJwtResponse, SMCumulocityMapperError> {
-        Ok(SmartRestJwtResponse::try_new("71,fake-token")?)
-    }
+    // During the sync phase, alarms are not converted immediately, but only cached to be synced later
+    assert!(converter.convert(&alarm_message).await.is_empty());
 
-    async fn send_software_list_http(
-        &mut self,
-        _c8y_software_list: &C8yUpdateSoftwareListResponse,
-    ) -> Result<(), SMCumulocityMapperError> {
-        Ok(())
-    }
+    let non_alarm_topic = "tedge/measurements";
+    let non_alarm_payload = r#"{"temp": 1}"#;
+    let non_alarm_message = Message::new(&Topic::new_unchecked(non_alarm_topic), non_alarm_payload);
 
-    async fn upload_log_binary(
-        &mut self,
-        _log_content: &str,
-    ) -> Result<String, SMCumulocityMapperError> {
-        Ok("fake/upload/url".into())
-    }
-}
+    // But non-alarms are converted immediately, even during the sync phase
+    assert!(!converter.convert(&non_alarm_message).await.is_empty());
 
-#[test_case("tedge/measurements/test", Some("test".to_string()); "valid child id")]
-#[test_case("tedge/measurements/", None; "returns an error (empty value)")]
-#[test_case("tedge/measurements", None; "invalid child id (parent topic)")]
-#[test_case("foo/bar", None; "invalid child id (invalid topic)")]
-fn extract_child_id(in_topic: &str, expected_child_id: Option<String>) {
-    match get_child_id_from_topic(in_topic) {
-        Ok(maybe_id) => assert_eq!(maybe_id, expected_child_id),
-        Err(crate::core::error::ConversionError::InvalidChildId { id }) => {
-            assert_eq!(id, "".to_string())
-        }
-        _ => {
-            panic!("Unexpected error type")
-        }
-    }
+    let internal_alarm_topic = "c8y-internal/alarms/major/pressure_alarm";
+    let internal_alarm_payload = r#"{ "message": "Temperature very high" }"#;
+    let internal_alarm_message = Message::new(
+        &Topic::new_unchecked(internal_alarm_topic),
+        internal_alarm_payload,
+    );
+
+    // During the sync phase, internal alarms are not converted, but only cached to be synced later
+    assert!(converter.convert(&internal_alarm_message).await.is_empty());
+
+    // When sync phase is complete, all pending alarms are returned
+    let sync_messages = converter.sync_messages();
+    assert_eq!(sync_messages.len(), 2);
+
+    // The first message will be clear alarm message for pressure_alarm
+    let alarm_message = sync_messages.get(0).unwrap();
+    assert_eq!(
+        alarm_message.topic.name,
+        "tedge/alarms/major/pressure_alarm"
+    );
+    assert_eq!(alarm_message.payload_bytes().len(), 0); //Clear messages are empty messages
+
+    // The second message will be the temperature_alarm
+    let alarm_message = sync_messages.get(1).unwrap();
+    assert_eq!(alarm_message.topic.name, alarm_topic);
+    assert_eq!(alarm_message.payload_str().unwrap(), alarm_payload);
+
+    // After the sync phase, the conversion of both non-alarms as well as alarms are done immediately
+    assert!(!converter.convert(alarm_message).await.is_empty());
+    assert!(!converter.convert(&non_alarm_message).await.is_empty());
+
+    // But, even after the sync phase, internal alarms are not converted and just ignored, as they are purely internal
+    assert!(converter.convert(&internal_alarm_message).await.is_empty());
 }
 
 #[tokio::test]
@@ -678,6 +697,22 @@ async fn convert_two_thin_edge_json_messages_given_different_child_id() {
     );
 }
 
+#[test_case("tedge/measurements/test", Some("test".to_string()); "valid child id")]
+#[test_case("tedge/measurements/", None; "returns an error (empty value)")]
+#[test_case("tedge/measurements", None; "invalid child id (parent topic)")]
+#[test_case("foo/bar", None; "invalid child id (invalid topic)")]
+fn extract_child_id(in_topic: &str, expected_child_id: Option<String>) {
+    match get_child_id_from_topic(in_topic) {
+        Ok(maybe_id) => assert_eq!(maybe_id, expected_child_id),
+        Err(crate::core::error::ConversionError::InvalidChildId { id }) => {
+            assert_eq!(id, "".to_string())
+        }
+        _ => {
+            panic!("Unexpected error type")
+        }
+    }
+}
+
 #[test]
 fn check_c8y_threshold_packet_size() -> Result<(), anyhow::Error> {
     let size_threshold = SizeThreshold(16 * 1024);
@@ -710,6 +745,37 @@ fn create_packet(size: usize) -> String {
         buffer.push_str("Some data!");
     }
     buffer
+}
+
+pub struct FakeC8YHttpProxy {}
+
+#[async_trait::async_trait]
+impl C8YHttpProxy for FakeC8YHttpProxy {
+    async fn init(&mut self) -> Result<(), SMCumulocityMapperError> {
+        Ok(())
+    }
+
+    fn url_is_in_my_tenant_domain(&self, _url: &str) -> bool {
+        true
+    }
+
+    async fn get_jwt_token(&mut self) -> Result<SmartRestJwtResponse, SMCumulocityMapperError> {
+        Ok(SmartRestJwtResponse::try_new("71,fake-token")?)
+    }
+
+    async fn send_software_list_http(
+        &mut self,
+        _c8y_software_list: &C8yUpdateSoftwareListResponse,
+    ) -> Result<(), SMCumulocityMapperError> {
+        Ok(())
+    }
+
+    async fn upload_log_binary(
+        &mut self,
+        _log_content: &str,
+    ) -> Result<String, SMCumulocityMapperError> {
+        Ok("fake/upload/url".into())
+    }
 }
 
 async fn start_c8y_mapper(mqtt_port: u16) -> Result<JoinHandle<()>, anyhow::Error> {
