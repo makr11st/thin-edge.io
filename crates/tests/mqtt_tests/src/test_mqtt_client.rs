@@ -52,7 +52,10 @@ pub async fn assert_received<T>(
     }
 }
 
-/// Push received `messages` until all messages containing `expected` strings have been received or until `timeout`.
+/// Pull the received `messages` until all the `expected` messages have been received or timeout reached.
+///
+/// A message is expected if containing one of the `expected` strings.
+/// Returns early on `timeout` while waiting for the next message.
 pub async fn assert_received_all_expected<T>(
     messages: &mut UnboundedReceiver<String>,
     timeout: Duration,
